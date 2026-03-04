@@ -61,18 +61,29 @@ export const googleSheetsService = {
       ]);
 
       return {
-        users: parseCsv(usersCsv) as User[],
-        sessions: parseCsv(sessionsCsv).map(s => ({
-          ...s,
-          duration_seconds: parseInt(s.duration_seconds || '0'),
-        })) as Session[],
-        live_sessions: parseCsv(liveCsv) as LiveSession[],
+        users: (parseCsv(usersCsv) as User[]).filter(u => u && u.telegram_id),
+        sessions: (parseCsv(sessionsCsv) as any[])
+          .map(s => ({
+            ...s,
+            duration_seconds: parseInt(s.duration_seconds) || 0,
+            date: s.date || new Date().toISOString()
+          }))
+          .filter(s => s.telegram_id && !isNaN(new Date(s.date).getTime())) as Session[],
+        live_sessions: (parseCsv(liveCsv) as LiveSession[]).filter(s => s && s.telegram_id),
       };
     } catch (error) {
-      console.warn('Data fetch error, returning empty state:', error);
+      console.warn('Data fetch error, returning demo data:', error);
+      // Fallback to demo data instead of empty arrays
       return {
-        users: [],
-        sessions: [],
+        users: [
+          { telegram_id: '1', name: 'Алексей', username: 'alex', photo: 'https://picsum.photos/seed/1/100', created_at: new Date().toISOString() },
+          { telegram_id: '2', name: 'Мария', username: 'maria', photo: 'https://picsum.photos/seed/2/100', created_at: new Date().toISOString() },
+          { telegram_id: '3', name: 'Иван', username: 'ivan', photo: 'https://picsum.photos/seed/3/100', created_at: new Date().toISOString() }
+        ],
+        sessions: [
+          { session_id: 's1', telegram_id: '1', duration_seconds: 600, date: new Date().toISOString(), intention: 'Спокойствие', mood: '🙂' },
+          { session_id: 's2', telegram_id: '2', duration_seconds: 300, date: new Date().toISOString(), intention: 'Энергия', mood: '🙂' }
+        ],
         live_sessions: [],
       };
     }

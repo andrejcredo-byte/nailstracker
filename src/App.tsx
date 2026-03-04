@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Timer } from './components/Timer';
 import { LiveSessions } from './components/LiveSessions';
@@ -12,8 +12,8 @@ import { PersonalStats } from './components/PersonalStats';
 import { SocialFeed } from './components/SocialFeed';
 import { Loader2, Frown, RefreshCw } from 'lucide-react';
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: ReactNode }) {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -22,7 +22,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
   }
 
@@ -31,7 +31,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
       return (
         <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center space-y-6">
           <div className="w-20 h-20 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mx-auto">
-            <RefreshCw size={40} className="animate-spin-slow" />
+            <RefreshCw size={40} className="animate-spin" />
           </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-bold">Что-то пошло не так</h2>
@@ -53,6 +53,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 function Dashboard() {
   const { user, loading, data, refreshData } = useApp();
+  console.log('Dashboard render:', { hasUser: !!user, loading, hasData: !!data });
 
   if (loading) {
     return (
@@ -109,25 +110,11 @@ function Dashboard() {
       </header>
 
       <main className="px-6 mt-6 space-y-10">
-        {!data ? (
-          <div className="py-12 text-center space-y-4 bg-zinc-900/30 rounded-3xl border border-dashed border-zinc-800">
-            <p className="text-zinc-500 text-sm">Проблемы с подключением к базе данных...</p>
-            <button 
-              onClick={refreshData}
-              className="text-emerald-500 text-xs font-bold uppercase tracking-widest"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : (
-          <>
-            <LiveSessions />
-            <Timer />
-            <SocialFeed />
-            <PersonalStats />
-            <Leaderboard />
-          </>
-        )}
+        <LiveSessions />
+        <Timer />
+        <SocialFeed />
+        <PersonalStats />
+        <Leaderboard />
       </main>
 
       <footer className="mt-12 px-6 py-8 border-t border-zinc-900 text-center">

@@ -12,8 +12,10 @@ export function formatDuration(seconds: number): string {
 }
 
 export function calculateStreak(sessions: any[], telegramId: string): number {
+  if (!sessions || !telegramId) return 0;
+  
   const userSessions = sessions
-    .filter(s => s.telegram_id == telegramId)
+    .filter(s => s.telegram_id == telegramId && s.date && !isNaN(new Date(s.date).getTime()))
     .map(s => new Date(s.date).toDateString())
     .filter((v, i, a) => a.indexOf(v) === i) // unique dates
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());

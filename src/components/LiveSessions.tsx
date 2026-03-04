@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { formatDuration } from '../utils';
 
@@ -12,7 +11,7 @@ export const LiveSessions: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const liveSessions = data?.live_sessions || [];
+  const liveSessions = (data?.live_sessions || []);
 
   if (liveSessions.length === 0) return null;
 
@@ -24,13 +23,11 @@ export const LiveSessions: React.FC = () => {
       </div>
       <div className="space-y-3">
         {liveSessions.map((session) => {
-          const user = data?.users.find(u => u.telegram_id === session.telegram_id);
+          const user = (data?.users || []).find(u => u.telegram_id === session.telegram_id);
           const elapsed = Math.floor((now - new Date(session.start_time).getTime()) / 1000);
           
           return (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            <div
               key={session.telegram_id}
               className="flex items-center justify-between bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/50"
             >
@@ -58,7 +55,7 @@ export const LiveSessions: React.FC = () => {
                   }
                 })()}
               </div>
-            </motion.div>
+            </div>
           );
         })}
       </div>

@@ -9,15 +9,21 @@ export const PersonalStats: React.FC = () => {
 
   if (!user || !data) return null;
 
-  const userSessions = data.sessions.filter(s => s.telegram_id === user.telegram_id);
-  const streak = calculateStreak(data.sessions, user.telegram_id);
-  const bestSeconds = Math.max(0, ...userSessions.map(s => s.duration_seconds));
+  const userSessions = (data?.sessions || []).filter(s => s.telegram_id === user.telegram_id);
+  const streak = calculateStreak(data?.sessions || [], user.telegram_id);
+  const bestSeconds = Math.max(0, ...userSessions.map(s => Number(s.duration_seconds) || 0));
   
   const last7Days = new Date();
   last7Days.setDate(last7Days.getDate() - 7);
-  const recentSessions = userSessions.filter(s => new Date(s.date) > last7Days);
+  const recentSessions = userSessions.filter(s => {
+    try {
+      return s.date && new Date(s.date) > last7Days;
+    } catch (e) {
+      return false;
+    }
+  });
   const avgSeconds = recentSessions.length > 0 
-    ? recentSessions.reduce((acc, s) => acc + s.duration_seconds, 0) / 7 
+    ? recentSessions.reduce((acc, s) => acc + (Number(s.duration_seconds) || 0), 0) / 7 
     : 0;
 
   // Chart data
@@ -26,13 +32,20 @@ export const PersonalStats: React.FC = () => {
     d.setDate(d.getDate() - (6 - i));
     const dateStr = d.toDateString();
     const dayName = d.toLocaleDateString('ru-RU', { weekday: 'short' });
-    const seconds = userSessions
-      .filter(s => new Date(s.date).toDateString() === dateStr)
-      .reduce((acc, s) => acc + s.duration_seconds, 0);
+    
+    const daySessions = userSessions.filter(s => {
+      try {
+        return s.date && new Date(s.date).toDateString() === dateStr;
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    const seconds = daySessions.reduce((acc, s) => acc + (Number(s.duration_seconds) || 0), 0);
     
     return {
-      name: dayName,
-      minutes: Math.floor(seconds / 60),
+      name: dayName || '?',
+      minutes: Math.floor(seconds / 60) || 0,
       fullDate: dateStr
     };
   });

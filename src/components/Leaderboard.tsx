@@ -8,30 +8,42 @@ export const Leaderboard: React.FC = () => {
 
   if (!data) return null;
 
-  const stats = data.users.map(user => {
-    const userSessions = data.sessions.filter(s => s.telegram_id === user.telegram_id);
+  const stats = (data?.users || []).map(user => {
+    const userSessions = (data?.sessions || []).filter(s => s.telegram_id === user.telegram_id);
     const today = new Date().toDateString();
     const todaySeconds = userSessions
-      .filter(s => new Date(s.date).toDateString() === today)
-      .reduce((acc, s) => acc + s.duration_seconds, 0);
+      .filter(s => {
+        try {
+          return s.date && new Date(s.date).toDateString() === today;
+        } catch (e) {
+          return false;
+        }
+      })
+      .reduce((acc, s) => acc + (Number(s.duration_seconds) || 0), 0);
 
-    const bestSeconds = Math.max(0, ...userSessions.map(s => s.duration_seconds));
+    const bestSeconds = Math.max(0, ...userSessions.map(s => Number(s.duration_seconds) || 0));
     
     const last7Days = new Date();
     last7Days.setDate(last7Days.getDate() - 7);
-    const recentSessions = userSessions.filter(s => new Date(s.date) > last7Days);
+    const recentSessions = userSessions.filter(s => {
+      try {
+        return s.date && new Date(s.date) > last7Days;
+      } catch (e) {
+        return false;
+      }
+    });
     const avgSeconds = recentSessions.length > 0 
-      ? recentSessions.reduce((acc, s) => acc + s.duration_seconds, 0) / 7 
+      ? recentSessions.reduce((acc, s) => acc + (Number(s.duration_seconds) || 0), 0) / 7 
       : 0;
 
     return {
       ...user,
-      streak: calculateStreak(data.sessions, user.telegram_id),
-      todaySeconds,
-      avgSeconds,
-      bestSeconds
+      streak: calculateStreak(data?.sessions || [], user.telegram_id) || 0,
+      todaySeconds: todaySeconds || 0,
+      avgSeconds: avgSeconds || 0,
+      bestSeconds: bestSeconds || 0
     };
-  }).sort((a, b) => b.streak - a.streak || b.todaySeconds - a.todaySeconds);
+  }).sort((a, b) => (b.streak || 0) - (a.streak || 0) || (b.todaySeconds || 0) - (a.todaySeconds || 0));
 
   return (
     <div className="space-y-4">

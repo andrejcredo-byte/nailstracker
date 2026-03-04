@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Pause, Smile, Meh, Frown, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatDuration } from '../utils';
@@ -15,9 +14,10 @@ export const Timer: React.FC = () => {
   const timerRef = useRef<any>(null);
 
   useEffect(() => {
-    if (data?.live_sessions && user) {
+    const liveSessions = (data?.live_sessions || []);
+    if (liveSessions.length > 0 && user) {
       try {
-        const live = data.live_sessions.find(s => s.telegram_id === user.telegram_id);
+        const live = liveSessions.find(s => s.telegram_id === user.telegram_id);
         if (live && !isPracticing) {
           const startTimeStr = live.start_time;
           if (startTimeStr) {

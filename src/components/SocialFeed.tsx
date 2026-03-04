@@ -7,9 +7,21 @@ export const SocialFeed: React.FC = () => {
   if (!data) return null;
 
   const today = new Date().toDateString();
-  const todayPractices = data.sessions
-    .filter(s => new Date(s.date).toDateString() === today)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const todayPractices = (data?.sessions || [])
+    .filter(s => {
+      try {
+        return s.date && new Date(s.date).toDateString() === today;
+      } catch (e) {
+        return false;
+      }
+    })
+    .sort((a, b) => {
+      try {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      } catch (e) {
+        return 0;
+      }
+    });
 
   if (todayPractices.length === 0) return null;
 
@@ -18,7 +30,7 @@ export const SocialFeed: React.FC = () => {
       <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Сегодня практиковали</h3>
       <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar">
         {todayPractices.map((session) => {
-          const user = data.users.find(u => u.telegram_id === session.telegram_id);
+          const user = (data?.users || []).find(u => u.telegram_id === session.telegram_id);
           return (
             <div 
               key={session.session_id} 

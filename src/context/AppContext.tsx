@@ -4,7 +4,7 @@ import { googleSheetsService } from '../services/googleSheetsService';
 
 interface AppContextType {
   user: User | null;
-  data: AppData | null;
+  data: AppData;
   loading: boolean;
   refreshData: () => Promise<void>;
   startPractice: (intention: string) => Promise<void>;
@@ -15,7 +15,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData | null>(null);
+  const [data, setData] = useState<AppData>({ users: [], sessions: [], live_sessions: [] });
   const [loading, setLoading] = useState(true);
 
   const refreshData = async () => {
@@ -29,8 +29,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const initApp = async () => {
+      // Принудительный тайм-аут загрузки (7 секунд)
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          console.warn('Loading timeout reached, forcing app to show');
+          setLoading(false);
+        }
+      }, 7000);
+
       try {
-        // Telegram WebApp initialization
         const tg = (window as any).Telegram?.WebApp;
         
         if (tg) {
@@ -74,6 +81,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (error) {
         console.error('Critical init error:', error);
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     };
