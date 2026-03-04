@@ -3,13 +3,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Timer } from './components/Timer';
 import { LiveSessions } from './components/LiveSessions';
 import { Leaderboard } from './components/Leaderboard';
 import { PersonalStats } from './components/PersonalStats';
 import { SocialFeed } from './components/SocialFeed';
-import { Loader2, Frown } from 'lucide-react';
+import { Loader2, Frown, RefreshCw } from 'lucide-react';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center space-y-6">
+          <div className="w-20 h-20 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mx-auto">
+            <RefreshCw size={40} className="animate-spin-slow" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold">Что-то пошло не так</h2>
+            <p className="text-zinc-500">Произошла ошибка при отрисовке интерфейса.</p>
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-8 py-3 bg-white text-black rounded-2xl font-bold"
+          >
+            Перезагрузить приложение
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 function Dashboard() {
   const { user, loading, data, refreshData } = useApp();
@@ -101,8 +141,10 @@ function Dashboard() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <Dashboard />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <Dashboard />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

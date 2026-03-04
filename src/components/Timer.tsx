@@ -50,19 +50,14 @@ export const Timer: React.FC = () => {
 
   const handleStart = async () => {
     if (!intention.trim()) return;
-    
-    // Оптимистичное обновление UI
     setShowIntentionModal(false);
     setIsPracticing(true);
     setSeconds(0);
     setIsPaused(false);
-
     try {
       await startPractice(intention);
     } catch (error) {
-      console.error('Failed to start practice on server:', error);
-      // Мы не останавливаем таймер, чтобы не пугать пользователя, 
-      // сессия все равно запишется при завершении.
+      console.error('Failed to start practice:', error);
     }
   };
 
@@ -73,7 +68,11 @@ export const Timer: React.FC = () => {
   };
 
   const submitPractice = async (mood: string) => {
-    await endPractice(seconds, intention, mood);
+    try {
+      await endPractice(seconds, intention, mood);
+    } catch (e) {
+      console.error('End session error:', e);
+    }
     setShowMoodModal(false);
     setSeconds(0);
     setIntention('');
@@ -82,14 +81,13 @@ export const Timer: React.FC = () => {
   return (
     <div className="w-full space-y-6">
       {!isPracticing ? (
-        <motion.button
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => setShowIntentionModal(true)}
-          className="w-full py-8 bg-emerald-500 text-black rounded-3xl font-bold text-2xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/20"
+          className="w-full py-8 bg-emerald-500 text-black rounded-3xl font-bold text-2xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-transform"
         >
           <Play fill="currentColor" size={28} />
           НАЧАТЬ ПРАКТИКУ
-        </motion.button>
+        </button>
       ) : (
         <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center space-y-6">
           <div className="text-zinc-500 uppercase tracking-widest text-xs font-bold">Текущая практика</div>
@@ -104,14 +102,14 @@ export const Timer: React.FC = () => {
           <div className="flex gap-4 w-full">
             <button
               onClick={() => setIsPaused(!isPaused)}
-              className="flex-1 py-4 bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 font-bold"
+              className="flex-1 py-4 bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 font-bold active:bg-zinc-700"
             >
               {isPaused ? <Play size={20} /> : <Pause size={20} />}
               {isPaused ? 'Продолжить' : 'Пауза'}
             </button>
             <button
               onClick={handleEnd}
-              className="flex-1 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl flex items-center justify-center gap-2 font-bold"
+              className="flex-1 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl flex items-center justify-center gap-2 font-bold active:bg-red-500/20"
             >
               <Square size={20} fill="currentColor" />
               Завершить
@@ -121,99 +119,69 @@ export const Timer: React.FC = () => {
       )}
 
       {/* Intention Modal */}
-      <AnimatePresence>
-        {showIntentionModal && (
-          <motion.div
-            key="intention-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={(e) => e.target === e.currentTarget && setShowIntentionModal(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-md bg-zinc-900 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-6 border-t border-zinc-800 sm:border"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="space-y-2">
-                <h3 className="text-2xl font-bold text-white">Твое намерение?</h3>
-                <p className="text-zinc-500 text-sm">Сформулируй запрос на эту практику</p>
-              </div>
-              <textarea
-                autoFocus
-                value={intention}
-                onChange={(e) => setIntention(e.target.value)}
-                placeholder="Например: Спокойствие и ясность ума..."
-                className="w-full bg-zinc-800 rounded-2xl p-4 text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[120px] resize-none"
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowIntentionModal(false)}
-                  className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold active:scale-95 transition-transform"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleStart}
-                  disabled={!intention.trim()}
-                  className="flex-[2] py-4 bg-emerald-500 text-black rounded-2xl font-bold disabled:opacity-50 active:scale-95 transition-transform"
-                >
-                  Погнали
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showIntentionModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/80">
+          <div className="w-full max-w-md bg-zinc-900 rounded-t-[2.5rem] sm:rounded-[2.5rem] p-8 space-y-6 border-t border-zinc-800 sm:border">
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-white">Твое намерение?</h3>
+              <p className="text-zinc-500 text-sm">Сформулируй запрос на эту практику</p>
+            </div>
+            <textarea
+              autoFocus
+              value={intention}
+              onChange={(e) => setIntention(e.target.value)}
+              placeholder="Например: Спокойствие и ясность ума..."
+              className="w-full bg-zinc-800 rounded-2xl p-4 text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-emerald-500 outline-none min-h-[120px] resize-none"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowIntentionModal(false)}
+                className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleStart}
+                disabled={!intention.trim()}
+                className="flex-[2] py-4 bg-emerald-500 text-black rounded-2xl font-bold disabled:opacity-50"
+              >
+                Погнали
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mood Modal */}
-      <AnimatePresence>
-        {showMoodModal && (
-          <motion.div
-            key="mood-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-zinc-900 rounded-[2.5rem] p-8 space-y-8 text-center border border-zinc-800"
-            >
-              <div className="space-y-2">
-                <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Sparkles size={32} />
-                </div>
-                <h3 className="text-2xl font-bold text-white">Практика завершена!</h3>
-                <p className="text-zinc-500">Ты простоял {formatDuration(seconds)}. Как самочувствие?</p>
+      {showMoodModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90">
+          <div className="w-full max-w-md bg-zinc-900 rounded-[2.5rem] p-8 space-y-8 text-center border border-zinc-800">
+            <div className="space-y-2">
+              <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={32} />
               </div>
-              
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { icon: <Smile size={32} />, label: 'Хорошо', emoji: '🙂', color: 'text-emerald-500 bg-emerald-500/10' },
-                  { icon: <Meh size={32} />, label: 'Нормально', emoji: '😐', color: 'text-amber-500 bg-amber-500/10' },
-                  { icon: <Frown size={32} />, label: 'Тяжело', emoji: '😣', color: 'text-red-500 bg-red-500/10' },
-                ].map((m) => (
-                  <button
-                    key={m.emoji}
-                    onClick={() => submitPractice(m.emoji)}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all active:scale-90 ${m.color}`}
-                  >
-                    {m.icon}
-                    <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <h3 className="text-2xl font-bold text-white">Практика завершена!</h3>
+              <p className="text-zinc-500">Ты простоял {formatDuration(seconds)}. Как самочувствие?</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { icon: <Smile size={32} />, label: 'Хорошо', emoji: '🙂', color: 'text-emerald-500 bg-emerald-500/10' },
+                { icon: <Meh size={32} />, label: 'Нормально', emoji: '😐', color: 'text-amber-500 bg-amber-500/10' },
+                { icon: <Frown size={32} />, label: 'Тяжело', emoji: '😣', color: 'text-red-500 bg-red-500/10' },
+              ].map((m) => (
+                <button
+                  key={m.emoji}
+                  onClick={() => submitPractice(m.emoji)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all active:scale-90 ${m.color}`}
+                >
+                  {m.icon}
+                  <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
