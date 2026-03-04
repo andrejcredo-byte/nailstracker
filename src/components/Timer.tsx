@@ -48,17 +48,18 @@ export const Timer: React.FC = () => {
     };
   }, [isPracticing, isPaused]);
 
-  const handleStart = async () => {
+  const handleStart = () => {
     if (!intention.trim()) return;
+    const currentIntention = intention;
     setShowIntentionModal(false);
     setIsPracticing(true);
     setSeconds(0);
     setIsPaused(false);
-    try {
-      await startPractice(intention);
-    } catch (error) {
+    
+    // Запускаем в фоне
+    startPractice(currentIntention).catch(error => {
       console.error('Failed to start practice:', error);
-    }
+    });
   };
 
   const handleEnd = () => {
@@ -67,15 +68,21 @@ export const Timer: React.FC = () => {
     setShowMoodModal(true);
   };
 
-  const submitPractice = async (mood: string) => {
-    try {
-      await endPractice(seconds, intention, mood);
-    } catch (e) {
-      console.error('End session error:', e);
-    }
+  const submitPractice = (mood: string) => {
+    // Не ждем завершения сетевого запроса, закрываем модалку сразу
+    const currentSeconds = seconds;
+    const currentIntention = intention;
+    
     setShowMoodModal(false);
     setSeconds(0);
     setIntention('');
+    setIsPracticing(false);
+    setIsPaused(false);
+
+    // Запускаем сохранение в фоне
+    endPractice(currentSeconds, currentIntention, mood).catch(e => {
+      console.error('End session error:', e);
+    });
   };
 
   return (

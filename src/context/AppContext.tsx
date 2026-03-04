@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppData, User } from '../types';
+import { AppData, User, Session, LiveSession } from '../types';
 import { googleSheetsService } from '../services/googleSheetsService';
 
 interface AppContextType {
@@ -17,11 +17,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<AppData>({ users: [], sessions: [], live_sessions: [] });
   const [loading, setLoading] = useState(true);
+  const [pendingSessions, setPendingSessions] = useState<Session[]>([]);
 
   const refreshData = async () => {
     try {
       const newData = await googleSheetsService.fetchData();
-      setData(newData);
+      
+      // Фильтруем pendingSessions: оставляем только те, которых еще нет в newData.sessions
+      setPendingSessions(prev => {
+        const newPending = prev.filter(ps => 
+          !newData.sessions.some(s => 
+            s.telegram_id === ps.telegram_id && 
+            Math.abs(new Date(s.date).getTime() - new Date(ps.date).getTime()) < 5000 // Погрешность 5 сек
+          )
+        );
+        
+        // Обновляем данные, объединяя серверные и оставшиеся локальные (pending)
+        setData({
+          ...newData,
+          sessions: [...newPending, ...newData.sessions]
+        });
+        
+        return newPending;
+      });
     } catch (error) {
       console.error('Failed to fetch data:', error);
     }
@@ -94,14 +112,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const startPractice = async (intention: string) => {
     if (!user) return;
-    await googleSheetsService.startSession(user.telegram_id, intention);
-    await refreshData();
+    
+    // Оптимистично добавляем в live_sessions
+    const optimisticLive: LiveSession = {
+      telegram_id: user.telegram_id,
+      start_time: new Date().toISOString(),
+      intention: intention
+    };
+
+    setData(prev => ({
+      ...prev,
+      live_sessions: [optimisticLive, ...prev.live_sessions.filter(s => s.telegram_id !== user.telegram_id)]
+    }));
+
+    try {
+      await googleSheetsService.startSession(user.telegram_id, intention);
+      await refreshData();
+    } catch (error) {
+      console.error('Failed to start session:', error);
+    }
   };
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
     if (!user) return;
-    await googleSheetsService.endSession(user.telegram_id, duration, intention, mood);
-    await refreshData();
+    
+    const optimisticSession: Session = {
+      session_id: 'temp-' + Date.now(),
+      telegram_id: user.telegram_id,
+      duration_seconds: duration,
+      date: new Date().toISOString(),
+      intention: intention,
+      mood: mood
+    };
+
+    // Добавляем в список ожидающих подтверждения
+    setPendingSessions(prev => [optimisticSession, ...prev]);
+    
+    // Обновляем текущий UI
+    setData(prev => ({
+      ...prev,
+      sessions: [optimisticSession, ...prev.sessions],
+      live_sessions: prev.live_sessions.filter(s => s.telegram_id !== user.telegram_id)
+    }));
+
+    try {
+      await googleSheetsService.endSession(user.telegram_id, duration, intention, mood);
+      await refreshData();
+    } catch (error) {
+      console.error('Failed to save session:', error);
+    }
   };
 
   return (
