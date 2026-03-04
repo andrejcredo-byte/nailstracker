@@ -23,10 +23,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const newData = await googleSheetsService.fetchData();
       
+      // Защита от некорректных данных с сервера
+      const safeNewData = {
+        users: Array.isArray(newData?.users) ? newData.users : [],
+        sessions: Array.isArray(newData?.sessions) ? newData.sessions : [],
+        live_sessions: Array.isArray(newData?.live_sessions) ? newData.live_sessions : []
+      };
+
       // Фильтруем pendingSessions: оставляем только те, которых еще нет в newData.sessions
       setPendingSessions(prev => {
         const newPending = prev.filter(ps => 
-          !newData.sessions.some(s => 
+          !safeNewData.sessions.some(s => 
             s.telegram_id === ps.telegram_id && 
             Math.abs(new Date(s.date).getTime() - new Date(ps.date).getTime()) < 5000 // Погрешность 5 сек
           )
@@ -34,8 +41,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         // Обновляем данные, объединяя серверные и оставшиеся локальные (pending)
         setData({
-          ...newData,
-          sessions: [...newPending, ...newData.sessions]
+          ...safeNewData,
+          sessions: [...newPending, ...safeNewData.sessions]
         });
         
         return newPending;

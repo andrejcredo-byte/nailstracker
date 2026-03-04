@@ -5,19 +5,21 @@ const SHEET_ID = '1tzF7vL_vuwTtbb9bicJHDUE8ZAR6XlrlVuYXrttmhO0';
 
 // Helper to parse CSV to JSON
 function parseCsv(csv: string) {
-  if (!csv || !csv.includes(',')) return [];
-  const lines = csv.split('\n').filter(l => l.trim() !== '');
+  if (!csv || typeof csv !== 'string') return [];
+  const lines = csv.split('\n').map(l => l.trim()).filter(l => l !== '');
   if (lines.length === 0) return [];
   
   const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+  if (headers.length === 0) return [];
+
   return lines.slice(1).map(line => {
     const values = line.split(',').map(v => v.replace(/"/g, '').trim());
     const obj: any = {};
     headers.forEach((h, i) => {
-      obj[h] = values[i];
+      if (h) obj[h] = values[i] || '';
     });
     return obj;
-  }).filter(row => Object.values(row).some(v => v !== ''));
+  }).filter(row => row && Object.keys(row).length > 0 && row.telegram_id);
 }
 
 async function fetchWithTimeout(url: string, options: any = {}, timeout = 5000) {
