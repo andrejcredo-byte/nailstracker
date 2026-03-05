@@ -40,16 +40,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .from("live_sessions")
         .select("*");
 
+      let liveErrorMsg: string | null = null;
       if (liveError) {
-        console.warn('Supabase live_sessions fetch error (table might not exist):', liveError);
-        // We don't set a hard error here in case the table doesn't exist yet
+        console.error('Supabase live_sessions fetch error:', liveError);
+        if (liveError.code === 'PGRST116' || liveError.message.includes('does not exist')) {
+          liveErrorMsg = 'Таблица live_sessions не найдена.';
+        } else {
+          liveErrorMsg = `Ошибка Live: ${liveError.message}`;
+        }
       }
 
       console.log(`Fetched ${sessions?.length || 0} sessions and ${liveSessions?.length || 0} live sessions`);
       
       setData({
         sessions: sessions || [],
-        live_sessions: liveSessions || []
+        live_sessions: liveSessions || [],
+        live_error: liveErrorMsg
       });
       setError(null);
     } catch (err: any) {
@@ -92,6 +98,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           first_name: 'Разработчик',
           photo: 'https://picsum.photos/seed/dev/100',
           created_at: new Date().toISOString(),
+          is_mock: true,
         });
       }
 
@@ -106,7 +113,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const startPractice = async (intention: string) => {
-    if (!user) return;
+    if (!user || user.is_mock) {
+      console.log('Practice started in preview mode (not saving)');
+      return;
+    }
     
     try {
       console.log('Starting live session in Supabase...', { telegram_id: user.id, intention });
@@ -123,7 +133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (liveError) {
         console.error('Supabase live_sessions start error:', liveError);
-        // Don't show error to user, just log it
+        setError(`Ошибка запуска Live: ${liveError.message}. Проверьте наличие таблицы live_sessions.`);
       }
       
       await refreshData();
@@ -133,7 +143,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
-    if (!user) return;
+    if (!user || user.is_mock) {
+      console.log('Practice ended in preview mode (not saving)');
+      return;
+    }
     
     try {
       console.log('Saving session to Supabase...', { telegram_id: user.id, duration });

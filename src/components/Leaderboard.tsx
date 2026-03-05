@@ -46,6 +46,17 @@ export const Leaderboard: React.FC = () => {
     }
   }, [sessions]);
 
+  const openProfile = (username?: string) => {
+    if (!username) return;
+    const url = `https://t.me/${username}`;
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -71,19 +82,11 @@ export const Leaderboard: React.FC = () => {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        {u.username ? (
-                          <a href={`https://t.me/${u.username}`} target="_blank" rel="noopener noreferrer" className="block active:scale-95 transition-transform">
-                            <img 
-                              src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`}
-                              alt={u.name}
-                              className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`;
-                              }}
-                            />
-                          </a>
-                        ) : (
+                        <button 
+                          onClick={() => openProfile(u.username)}
+                          disabled={!u.username}
+                          className={`block transition-transform ${u.username ? 'active:scale-95 cursor-pointer' : 'cursor-default'}`}
+                        >
                           <img 
                             src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`}
                             alt={u.name}
@@ -93,19 +96,19 @@ export const Leaderboard: React.FC = () => {
                               (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`;
                             }}
                           />
-                        )}
+                        </button>
                         <div className="absolute -top-1 -left-1 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center text-[8px] font-bold border border-zinc-800 text-zinc-500">
                           {idx + 1}
                         </div>
                       </div>
                       <div className="flex flex-col">
-                        {u.username ? (
-                          <a href={`https://t.me/${u.username}`} target="_blank" rel="noopener noreferrer" className="font-bold text-sm hover:text-emerald-500 transition-colors">
-                            {u.name || 'Аноним'}
-                          </a>
-                        ) : (
-                          <span className="font-bold text-sm">{u.name || 'Аноним'}</span>
-                        )}
+                        <button 
+                          onClick={() => openProfile(u.username)}
+                          disabled={!u.username}
+                          className={`font-bold text-sm text-left ${u.username ? 'hover:text-emerald-500 cursor-pointer' : 'cursor-default'}`}
+                        >
+                          {u.name || 'Аноним'}
+                        </button>
                         <span className="text-[10px] text-zinc-500">
                           {new Date(u.last_session_time).toLocaleDateString()}
                         </span>

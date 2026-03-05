@@ -4,6 +4,7 @@ export interface User {
   first_name: string;
   photo: string;
   created_at: string;
+  is_mock?: boolean;
 }
 
 export interface Session {
@@ -21,4 +22,5 @@ export interface Session {
 export interface AppData {
   sessions: Session[];
   live_sessions?: any[];
+  live_error?: string | null;
 }

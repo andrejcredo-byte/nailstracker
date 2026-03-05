@@ -79,6 +79,16 @@ function Dashboard() {
           </button>
         </div>
       )}
+      {/* Preview Mode Banner */}
+      {user.is_mock && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-center gap-2">
+          <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">
+            Режим предпросмотра: практика не будет сохранена в историю
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       {!user ? (
         <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center space-y-6">
