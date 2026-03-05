@@ -121,9 +121,9 @@ function Dashboard() {
       </header>
 
       <main className="px-6 mt-6 space-y-10">
-        <LiveSessions />
         <Quotes />
         <Timer />
+        <LiveSessions />
         <SocialFeed />
         <PersonalStats />
         <Leaderboard />

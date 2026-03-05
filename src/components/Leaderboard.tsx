@@ -17,6 +17,7 @@ export const Leaderboard: React.FC = () => {
               acc[id] = {
                 telegram_id: id,
                 name: session.name || 'Аноним',
+                username: session.username,
                 photo_url: session.photo_url,
                 total_sessions: 0,
                 total_duration_seconds: 0,
@@ -32,6 +33,7 @@ export const Leaderboard: React.FC = () => {
             if (session.created_at && (!acc[id].last_session_time || new Date(session.created_at) > new Date(acc[id].last_session_time))) {
               acc[id].last_session_time = session.created_at;
               if (session.name) acc[id].name = session.name;
+              if (session.username) acc[id].username = session.username;
               if (session.photo_url) acc[id].photo_url = session.photo_url;
             }
 
@@ -69,21 +71,41 @@ export const Leaderboard: React.FC = () => {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <img 
-                          src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`}
-                          alt={u.name}
-                          className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`;
-                          }}
-                        />
+                        {u.username ? (
+                          <a href={`https://t.me/${u.username}`} target="_blank" rel="noopener noreferrer" className="block active:scale-95 transition-transform">
+                            <img 
+                              src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`}
+                              alt={u.name}
+                              className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`;
+                              }}
+                            />
+                          </a>
+                        ) : (
+                          <img 
+                            src={u.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`}
+                            alt={u.name}
+                            className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || 'U')}&background=random`;
+                            }}
+                          />
+                        )}
                         <div className="absolute -top-1 -left-1 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center text-[8px] font-bold border border-zinc-800 text-zinc-500">
                           {idx + 1}
                         </div>
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-bold text-sm">{u.name || 'Аноним'}</span>
+                        {u.username ? (
+                          <a href={`https://t.me/${u.username}`} target="_blank" rel="noopener noreferrer" className="font-bold text-sm hover:text-emerald-500 transition-colors">
+                            {u.name || 'Аноним'}
+                          </a>
+                        ) : (
+                          <span className="font-bold text-sm">{u.name || 'Аноним'}</span>
+                        )}
                         <span className="text-[10px] text-zinc-500">
                           {new Date(u.last_session_time).toLocaleDateString()}
                         </span>

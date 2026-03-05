@@ -46,15 +46,29 @@ export const SocialFeed: React.FC = () => {
               className="bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800/50 flex items-start gap-4 hover:border-zinc-700 transition-colors"
             >
               <div className="relative shrink-0">
-                <img 
-                  src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
-                  alt={session.name}
-                  className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
-                  }}
-                />
+                {session.username ? (
+                  <a href={`https://t.me/${session.username}`} target="_blank" rel="noopener noreferrer" className="block active:scale-95 transition-transform">
+                    <img 
+                      src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
+                      alt={session.name}
+                      className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
+                      }}
+                    />
+                  </a>
+                ) : (
+                  <img 
+                    src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
+                    alt={session.name}
+                    className="w-10 h-10 rounded-full border border-zinc-800 object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
+                    }}
+                  />
+                )}
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-zinc-900 rounded-full flex items-center justify-center text-[10px] border border-zinc-800">
                   {session.mood || '🧘'}
                 </div>
@@ -62,7 +76,13 @@ export const SocialFeed: React.FC = () => {
               
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  <div className="font-bold text-sm truncate text-white">{session.name || 'Участник'}</div>
+                  {session.username ? (
+                    <a href={`https://t.me/${session.username}`} target="_blank" rel="noopener noreferrer" className="font-bold text-sm truncate text-white hover:text-emerald-500 transition-colors">
+                      {session.name || 'Участник'}
+                    </a>
+                  ) : (
+                    <div className="font-bold text-sm truncate text-white">{session.name || 'Участник'}</div>
+                  )}
                   <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
                     <Clock size={10} />
                     {new Date(session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

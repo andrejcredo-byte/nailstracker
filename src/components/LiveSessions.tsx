@@ -12,7 +12,7 @@ export const LiveSessions: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-emerald-500">
         <Sparkles size={16} />
-        <h3 className="text-xs font-bold uppercase tracking-widest">Сейчас в практике ({liveSessions.length})</h3>
+        <h3 className="text-xs font-bold uppercase tracking-widest">Сейчас практикует: ({liveSessions.length})</h3>
       </div>
       
       <div className="flex flex-wrap gap-3">
@@ -29,22 +29,42 @@ export const LiveSessions: React.FC = () => {
               } animate-in fade-in zoom-in duration-300`}
             >
               <div className="relative">
-                <img 
-                  src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
-                  alt={session.name}
-                  className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
-                  }}
-                />
+                {session.username ? (
+                  <a href={`https://t.me/${session.username}`} target="_blank" rel="noopener noreferrer" className="block active:scale-95 transition-transform">
+                    <img 
+                      src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
+                      alt={session.name}
+                      className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
+                      }}
+                    />
+                  </a>
+                ) : (
+                  <img 
+                    src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
+                    alt={session.name}
+                    className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
+                    }}
+                  />
+                )}
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black animate-pulse" />
               </div>
               
               <div className="flex flex-col">
-                <span className="text-xs font-bold truncate max-w-[80px]">
-                  {isMe ? 'Ты' : session.name}
-                </span>
+                {session.username ? (
+                  <a href={`https://t.me/${session.username}`} target="_blank" rel="noopener noreferrer" className="text-xs font-bold truncate max-w-[80px] hover:text-emerald-500 transition-colors">
+                    {isMe ? 'Ты' : session.name}
+                  </a>
+                ) : (
+                  <span className="text-xs font-bold truncate max-w-[80px]">
+                    {isMe ? 'Ты' : session.name}
+                  </span>
+                )}
                 <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                   <Clock size={10} />
                   <span>{elapsedMins}м</span>

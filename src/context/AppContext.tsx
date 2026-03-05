@@ -115,6 +115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .upsert({
           telegram_id: user.id,
           name: user.first_name,
+          username: user.username,
           photo_url: user.photo,
           intention: intention,
           start_time: new Date().toISOString()
@@ -143,6 +144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .insert({
           telegram_id: user.id,
           name: user.first_name,
+          username: user.username,
           photo_url: user.photo,
           duration_seconds: duration,
           intention,
