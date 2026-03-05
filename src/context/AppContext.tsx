@@ -1,5 +1,5 @@
 import React from "react"
-import { createContext, useContext, useEffect, useState } from "react"
+import React, { createContext, useContext, useEffect, useState } from "react"
 import { supabase } from "../supabaseClient"
 
 type Session = {
@@ -19,6 +19,7 @@ type AppState = {
 type AppContextType = {
   data: AppState
   loading: boolean
+  user: any
   refreshData: () => Promise<void>
   endPractice: (duration: number, intention: string, mood: string) => Promise<void>
 }
@@ -32,11 +33,13 @@ export const useApp = () => {
 }
 
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
+
   const [data, setData] = useState<AppState>({
     sessions: []
   })
 
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
 
   const refreshData = async () => {
     try {
@@ -60,15 +63,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
+
+    if (!user) {
+      console.warn("No Telegram user")
+      return
+    }
+
     try {
-      const tg = window.Telegram?.WebApp
-      const user = tg?.initDataUnsafe?.user
-
-      if (!user) {
-        console.warn("No Telegram user")
-        return
-      }
-
       const { error } = await supabase
         .from("sessions")
         .insert({
@@ -92,13 +93,33 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }
 
   useEffect(() => {
+
     const init = async () => {
-      setLoading(true)
+
+      const tg = (window as any).Telegram?.WebApp
+
+      if (tg) {
+        tg.ready()
+        tg.expand()
+
+        const telegramUser = tg.initDataUnsafe?.user
+
+        if (telegramUser) {
+          setUser(telegramUser)
+        } else {
+          console.warn("Telegram user not available yet")
+        }
+      } else {
+        console.warn("Telegram WebApp not detected")
+      }
+
       await refreshData()
+
       setLoading(false)
     }
 
     init()
+
   }, [])
 
   return (
@@ -106,6 +127,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         data,
         loading,
+        user,
         refreshData,
         endPractice
       }}
