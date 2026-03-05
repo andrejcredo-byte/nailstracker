@@ -51,6 +51,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       console.log(`Fetched ${sessions?.length || 0} sessions and ${liveSessions?.length || 0} live sessions`);
+      if (liveSessions && liveSessions.length > 0) {
+        console.log('Current live sessions:', liveSessions);
+      }
       
       setData({
         sessions: sessions || [],
@@ -119,26 +122,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     try {
-      console.log('Starting live session in Supabase...', { telegram_id: user.id, intention });
+      console.log('Starting live session...', { telegram_id: user.id, intention });
+      
+      // First, try to remove any stale session for this user
+      await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
+
       const { error: liveError } = await supabase
         .from("live_sessions")
-        .upsert({
+        .insert({
           telegram_id: user.id,
           name: user.first_name,
-          username: user.username,
-          photo_url: user.photo,
+          username: user.username || '',
+          photo_url: user.photo || '',
           intention: intention,
           start_time: new Date().toISOString()
         });
 
       if (liveError) {
         console.error('Supabase live_sessions start error:', liveError);
-        setError(`Ошибка запуска Live: ${liveError.message}. Проверьте наличие таблицы live_sessions.`);
+        setError(`Ошибка запуска Live: ${liveError.message} (Код: ${liveError.code})`);
+      } else {
+        console.log('Live session record created successfully');
+        await refreshData();
       }
-      
-      await refreshData();
-    } catch (err) {
-      console.error('Failed to start live session:', err);
+    } catch (err: any) {
+      console.error('Critical failure in startPractice:', err);
+      setError(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`);
     }
   };
 

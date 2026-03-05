@@ -54,7 +54,7 @@ export const LiveSessions: React.FC = () => {
           {liveSessions.map((session) => {
             const isMe = String(session.telegram_id) === String(user?.id);
             const startTime = new Date(session.start_time);
-            const elapsedMins = Math.floor((Date.now() - startTime.getTime()) / 60000);
+            const elapsedMins = isNaN(startTime.getTime()) ? 0 : Math.floor((Date.now() - startTime.getTime()) / 60000);
             
             return (
               <div 
