@@ -17,7 +17,7 @@ export const Timer: React.FC = () => {
     const liveSessions = (data?.live_sessions || []);
     if (liveSessions.length > 0 && user) {
       try {
-        const live = liveSessions.find(s => s.telegram_id === user.telegram_id);
+        const live = liveSessions.find(s => s.telegram_id === user.id);
         if (live && !isPracticing) {
           const startTimeStr = live.start_time;
           if (startTimeStr) {

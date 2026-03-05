@@ -1,28 +1,22 @@
 export interface User {
-  telegram_id: string;
+  id: string;
   username: string;
-  name: string;
+  first_name: string;
   photo: string;
   created_at: string;
 }
 
 export interface Session {
-  session_id: string;
+  id: string;
   telegram_id: string;
-  date: string;
+  name: string;
   duration_seconds: number;
   intention: string;
   mood: string;
-}
-
-export interface LiveSession {
-  telegram_id: string;
-  start_time: string;
-  intention: string;
+  created_at: string;
 }
 
 export interface AppData {
-  users: User[];
   sessions: Session[];
-  live_sessions: LiveSession[];
+  live_sessions?: any[];
 }

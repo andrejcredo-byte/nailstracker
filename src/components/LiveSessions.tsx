@@ -1,59 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useApp } from '../context/AppContext';
-import { formatDuration } from '../utils';
+import { Sparkles, Clock } from 'lucide-react';
 
 export const LiveSessions: React.FC = () => {
-  const { data, user: currentUser } = useApp();
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const liveSessions = (data?.live_sessions || []);
+  const { data, user } = useApp();
+  const liveSessions = data?.live_sessions || [];
 
   if (liveSessions.length === 0) return null;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Сейчас на гвоздях</h3>
-        <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <div className="flex items-center gap-2 text-emerald-500">
+        <Sparkles size={16} />
+        <h3 className="text-xs font-bold uppercase tracking-widest">Сейчас в практике ({liveSessions.length})</h3>
       </div>
-      <div className="space-y-3">
+      
+      <div className="flex flex-wrap gap-3">
         {liveSessions.map((session) => {
-          const user = (data?.users || []).find(u => u.telegram_id === session.telegram_id);
-          const elapsed = Math.floor((now - new Date(session.start_time).getTime()) / 1000);
+          const isMe = session.telegram_id === user?.id;
+          const startTime = new Date(session.start_time);
+          const elapsedMins = Math.floor((Date.now() - startTime.getTime()) / 60000);
           
           return (
-            <div
+            <div 
               key={session.telegram_id}
-              className="flex items-center justify-between bg-zinc-900/50 p-3 rounded-2xl border border-zinc-800/50"
+              className={`flex items-center gap-3 p-3 rounded-2xl border ${
+                isMe ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'
+              } animate-in fade-in zoom-in duration-300`}
             >
-              <div className="flex items-center gap-3">
-                <img
-                  src={user?.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}`}
-                  alt={user?.name || 'User'}
-                  className="w-10 h-10 rounded-full border border-zinc-700 object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="min-w-0">
-                  <div className="font-bold text-sm truncate">{user?.name || 'Участник'} {session.telegram_id === currentUser?.telegram_id && '(Вы)'}</div>
-                  <div className="text-zinc-500 text-xs truncate max-w-[150px]">«{session.intention || 'Без намерения'}»</div>
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold border border-zinc-700 overflow-hidden">
+                  {session.name?.[0] || '?'}
                 </div>
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black animate-pulse" />
               </div>
-              <div className="font-mono font-bold text-emerald-500 ml-2">
-                {(() => {
-                  try {
-                    const start = new Date(session.start_time).getTime();
-                    if (isNaN(start)) return '00:00';
-                    const elapsed = Math.max(0, Math.floor((now - start) / 1000));
-                    return formatDuration(elapsed);
-                  } catch (e) {
-                    return '00:00';
-                  }
-                })()}
+              
+              <div className="flex flex-col">
+                <span className="text-xs font-bold truncate max-w-[80px]">
+                  {isMe ? 'Ты' : session.name}
+                </span>
+                <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+                  <Clock size={10} />
+                  <span>{elapsedMins}м</span>
+                </div>
               </div>
             </div>
           );

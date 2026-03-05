@@ -1,23 +1,24 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { Flame, Trophy, Clock, Calendar } from 'lucide-react';
+import { Flame, Trophy, Calendar } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { calculateStreak } from '../utils';
 
 export const PersonalStats: React.FC = () => {
   const { user, data } = useApp();
+  const sessions = data?.sessions || [];
 
-  if (!user || !data) return null;
+  if (!user) return null;
 
-  const userSessions = (data?.sessions || []).filter(s => s.telegram_id === user.telegram_id);
-  const streak = calculateStreak(data?.sessions || [], user.telegram_id);
+  const userSessions = (sessions || []).filter(s => s.telegram_id === user.id);
+  const streak = calculateStreak(sessions || [], user.id);
   const bestSeconds = Math.max(0, ...userSessions.map(s => Number(s.duration_seconds) || 0));
   
   const last7Days = new Date();
   last7Days.setDate(last7Days.getDate() - 7);
   const recentSessions = userSessions.filter(s => {
     try {
-      return s.date && new Date(s.date) > last7Days;
+      return s.created_at && new Date(s.created_at) > last7Days;
     } catch (e) {
       return false;
     }
@@ -35,7 +36,7 @@ export const PersonalStats: React.FC = () => {
     
     const daySessions = userSessions.filter(s => {
       try {
-        return s.date && new Date(s.date).toDateString() === dateStr;
+        return s.created_at && new Date(s.created_at).toDateString() === dateStr;
       } catch (e) {
         return false;
       }
