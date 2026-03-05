@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     if (text === "/start") {
 
-      const url = "https://api.telegram.org/bot" + process.env.8617761046:AAE3NTz6eGoSEe6E2SKte3fNFHq-bVKSMJ8 + "/sendMessage";
+      const url = "https://api.telegram.org/bot" + process.env.BOT_TOKEN + "/sendMessage";
 
       await fetch(url, {
         method: "POST",
