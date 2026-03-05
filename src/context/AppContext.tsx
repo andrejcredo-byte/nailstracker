@@ -24,18 +24,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       console.log('Fetching data from Supabase...');
       
-      // Fetch completed sessions
-      const { data: sessions, error: sessionsError } = await supabase
+      // 1. Cleanup stale live sessions (older than 3 hours)
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+      await supabase
+        .from("live_sessions")
+        .delete()
+        .lt('start_time', threeHoursAgo);
+
+      // 2. Fetch completed sessions
+      let { data: sessions, error: sessionsError } = await supabase
         .from("sessions")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (sessionsError) {
         console.error('Supabase sessions fetch error:', sessionsError);
-        setError(`Ошибка загрузки сессий: ${sessionsError.message}`);
+        // If created_at is missing, try fetching without order
+        if (sessionsError.message.includes('created_at')) {
+          const { data: retrySessions, error: retryError } = await supabase.from("sessions").select("*");
+          if (!retryError && retrySessions) {
+            sessions = retrySessions;
+            sessionsError = null; // Clear error if retry worked
+          }
+        }
+        
+        if (sessionsError) {
+          setError(`Ошибка загрузки сессий: ${sessionsError.message}`);
+        }
       }
 
-      // Fetch live sessions
+      // 3. Fetch live sessions
       const { data: liveSessions, error: liveError } = await supabase
         .from("live_sessions")
         .select("*");
