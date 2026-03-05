@@ -18,7 +18,7 @@ export const PersonalStats: React.FC = () => {
   last7Days.setDate(last7Days.getDate() - 7);
   const recentSessions = userSessions.filter(s => {
     try {
-      return s.created_at && new Date(s.created_at) > last7Days;
+      return s.start_time && new Date(s.start_time) > last7Days;
     } catch (e) {
       return false;
     }
@@ -36,7 +36,7 @@ export const PersonalStats: React.FC = () => {
     
     const daySessions = userSessions.filter(s => {
       try {
-        return s.created_at && new Date(s.created_at).toDateString() === dateStr;
+        return s.start_time && new Date(s.start_time).toDateString() === dateStr;
       } catch (e) {
         return false;
       }

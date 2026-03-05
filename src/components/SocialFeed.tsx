@@ -9,9 +9,9 @@ export const SocialFeed: React.FC = () => {
   const sessions = data?.sessions || [];
 
   const sortedSessions = [...(sessions || [])]
-    .filter(s => s && s.created_at)
+    .filter(s => s && s.start_time)
     .sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
     );
 
   if (sortedSessions.length === 0) return null;
@@ -89,8 +89,8 @@ export const SocialFeed: React.FC = () => {
                   <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
                     <Clock size={10} />
                     {(() => {
-                      if (!session.created_at) return '--:--';
-                      const d = new Date(session.created_at);
+                      if (!session.start_time) return '--:--';
+                      const d = new Date(session.start_time.replace(' ', 'T'));
                       return isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     })()}
                   </div>

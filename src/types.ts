@@ -16,7 +16,7 @@ export interface Session {
   duration_seconds: number;
   intention: string;
   mood: string;
-  created_at: string;
+  start_time: string;
 }
 
 export interface AppData {

@@ -22,7 +22,7 @@ export const Leaderboard: React.FC = () => {
                 total_sessions: 0,
                 total_duration_seconds: 0,
                 average_duration: 0,
-                last_session_time: session.created_at,
+                last_session_time: session.start_time,
               }
             }
 
@@ -30,8 +30,8 @@ export const Leaderboard: React.FC = () => {
             acc[id].total_duration_seconds += (Number(session.duration_seconds) || 0);
             acc[id].average_duration = acc[id].total_duration_seconds / acc[id].total_sessions;
             
-            if (session.created_at && (!acc[id].last_session_time || new Date(session.created_at) > new Date(acc[id].last_session_time))) {
-              acc[id].last_session_time = session.created_at;
+            if (session.start_time && (!acc[id].last_session_time || new Date(session.start_time) > new Date(acc[id].last_session_time))) {
+              acc[id].last_session_time = session.start_time;
               if (session.name) acc[id].name = session.name;
               if (session.username) acc[id].username = session.username;
               if (session.photo_url) acc[id].photo_url = session.photo_url;

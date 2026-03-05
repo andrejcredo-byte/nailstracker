@@ -47,12 +47,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let { data: sessions, error: sessionsError } = await supabase
         .from("sessions")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("start_time", { ascending: false });
 
       if (sessionsError) {
         console.error('Supabase sessions fetch error:', sessionsError);
-        // If created_at is missing, try fetching without order
-        if (sessionsError.message.includes('created_at')) {
+        // If start_time is missing, try fetching without order
+        if (sessionsError.message.includes('start_time')) {
           const { data: retrySessions, error: retryError } = await supabase.from("sessions").select("*");
           if (!retryError && retrySessions) {
             sessions = retrySessions;
@@ -223,7 +223,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           photo_url: user.photo,
           duration_seconds: duration,
           intention,
-          mood
+          mood,
+          start_time: new Date().toISOString()
         });
 
       if (insertError) {
