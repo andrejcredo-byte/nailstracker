@@ -7,6 +7,7 @@ interface AppContextType {
   data: AppData;
   loading: boolean;
   error: string | null;
+  isPracticing: boolean;
   refreshData: () => Promise<void>;
   startPractice: (intention: string) => Promise<void>;
   endPractice: (duration: number, intention: string, mood: string) => Promise<void>;
@@ -19,17 +20,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [data, setData] = useState<AppData>({ sessions: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPracticing, setIsPracticing] = useState(false);
 
   const refreshData = async () => {
     try {
       console.log('Fetching data from Supabase...');
       
-      // 1. Cleanup stale live sessions (older than 3 hours)
-      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+      // 1. Cleanup stale live sessions (older than 1 minute of inactivity)
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+      
+      // Delete sessions that haven't pinged in 1 minute
       await supabase
         .from("live_sessions")
         .delete()
-        .lt('start_time', threeHoursAgo);
+        .lt('last_ping', oneMinuteAgo);
+
+      // Fallback: delete sessions with null last_ping that started more than 5 mins ago
+      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      await supabase
+        .from("live_sessions")
+        .delete()
+        .is('last_ping', null)
+        .lt('start_time', fiveMinsAgo);
 
       // 2. Fetch completed sessions
       let { data: sessions, error: sessionsError } = await supabase
@@ -133,9 +145,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(interval);
   }, []);
 
+  // Heartbeat effect
+  useEffect(() => {
+    if (!isPracticing || !user || user.is_mock) return;
+
+    const sendPing = async () => {
+      try {
+        await supabase
+          .from("live_sessions")
+          .update({ last_ping: new Date().toISOString() })
+          .eq('telegram_id', user.id);
+      } catch (err) {
+        console.error('Heartbeat failed:', err);
+      }
+    };
+
+    const pingInterval = setInterval(sendPing, 20000); // Ping every 20 seconds
+    return () => clearInterval(pingInterval);
+  }, [isPracticing, user]);
+
   const startPractice = async (intention: string) => {
     if (!user || user.is_mock) {
       console.log('Practice started in preview mode (not saving)');
+      setIsPracticing(true);
       return;
     }
     
@@ -153,7 +185,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           username: user.username || '',
           photo_url: user.photo || '',
           intention: intention,
-          start_time: new Date().toISOString()
+          start_time: new Date().toISOString(),
+          last_ping: new Date().toISOString()
         });
 
       if (liveError) {
@@ -161,6 +194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setError(`Ошибка запуска Live: ${liveError.message} (Код: ${liveError.code})`);
       } else {
         console.log('Live session record created successfully');
+        setIsPracticing(true);
         await refreshData();
       }
     } catch (err: any) {
@@ -170,6 +204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
+    setIsPracticing(false);
     if (!user || user.is_mock) {
       console.log('Practice ended in preview mode (not saving)');
       return;
@@ -216,7 +251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return (
-    <AppContext.Provider value={{ user, data, loading, error, refreshData, startPractice, endPractice }}>
+    <AppContext.Provider value={{ user, data, loading, error, isPracticing, refreshData, startPractice, endPractice }}>
       {children}
     </AppContext.Provider>
   );

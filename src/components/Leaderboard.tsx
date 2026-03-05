@@ -110,7 +110,11 @@ export const Leaderboard: React.FC = () => {
                           {u.name || 'Аноним'}
                         </button>
                         <span className="text-[10px] text-zinc-500">
-                          {new Date(u.last_session_time).toLocaleDateString()}
+                          {(() => {
+                            if (!u.last_session_time) return '---';
+                            const d = new Date(u.last_session_time);
+                            return isNaN(d.getTime()) ? '---' : d.toLocaleDateString();
+                          })()}
                         </span>
                       </div>
                     </div>

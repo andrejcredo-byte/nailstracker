@@ -88,7 +88,11 @@ export const SocialFeed: React.FC = () => {
                   </button>
                   <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
                     <Clock size={10} />
-                    {new Date(session.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {(() => {
+                      if (!session.created_at) return '--:--';
+                      const d = new Date(session.created_at);
+                      return isNaN(d.getTime()) ? '--:--' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    })()}
                   </div>
                 </div>
                 <div className="text-emerald-500 text-xs font-bold mt-0.5">

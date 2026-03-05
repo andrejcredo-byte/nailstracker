@@ -53,8 +53,8 @@ export const LiveSessions: React.FC = () => {
         <div className="flex flex-wrap gap-3">
           {liveSessions.map((session) => {
             const isMe = String(session.telegram_id) === String(user?.id);
-            const startTime = new Date(session.start_time);
-            const elapsedMins = isNaN(startTime.getTime()) ? 0 : Math.floor((Date.now() - startTime.getTime()) / 60000);
+            const startTime = session.start_time ? new Date(session.start_time) : null;
+            const elapsedMins = (!startTime || isNaN(startTime.getTime())) ? 0 : Math.floor((Date.now() - startTime.getTime()) / 60000);
             
             return (
               <div 
