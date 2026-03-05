@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { Flame, Trophy, Calendar } from 'lucide-react';
+import { Flame, Trophy, Calendar, Info } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { calculateStreak } from '../utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 export const PersonalStats: React.FC = () => {
   const { user, data } = useApp();
+  const [selectedDay, setSelectedDay] = useState<any>(null);
   const sessions = data?.sessions || [];
 
   if (!user) return null;
@@ -18,7 +20,7 @@ export const PersonalStats: React.FC = () => {
   last7Days.setDate(last7Days.getDate() - 7);
   const recentSessions = userSessions.filter(s => {
     try {
-      return s.start_time && new Date(s.start_time) > last7Days;
+      return s.start_time && new Date(s.start_time.replace(' ', 'T')) > last7Days;
     } catch (e) {
       return false;
     }
@@ -36,7 +38,7 @@ export const PersonalStats: React.FC = () => {
     
     const daySessions = userSessions.filter(s => {
       try {
-        return s.start_time && new Date(s.start_time).toDateString() === dateStr;
+        return s.start_time && new Date(s.start_time.replace(' ', 'T')).toDateString() === dateStr;
       } catch (e) {
         return false;
       }
@@ -47,9 +49,21 @@ export const PersonalStats: React.FC = () => {
     return {
       name: dayName || '?',
       minutes: Math.floor(seconds / 60) || 0,
-      fullDate: dateStr
+      seconds: seconds % 60,
+      totalSeconds: seconds,
+      sessionsCount: daySessions.length,
+      fullDate: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
+      dateStr: dateStr
     };
   });
+
+  const handleBarClick = (data: any) => {
+    if (selectedDay?.dateStr === data.dateStr) {
+      setSelectedDay(null);
+    } else {
+      setSelectedDay(data);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -94,28 +108,63 @@ export const PersonalStats: React.FC = () => {
               />
               <Tooltip 
                 cursor={{ fill: 'transparent' }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-zinc-800 border border-zinc-700 p-2 rounded-lg text-xs shadow-xl">
-                        <p className="font-bold">{payload[0].value} мин</p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
+                content={() => null} // We use custom click behavior instead
               />
-              <Bar dataKey="minutes" radius={[6, 6, 6, 6]}>
+              <Bar 
+                dataKey="minutes" 
+                radius={[6, 6, 6, 6]}
+                onClick={handleBarClick}
+                className="cursor-pointer"
+              >
                 {chartData.map((entry, index) => (
                   <Cell 
                     key={`cell-${index}`} 
-                    fill={entry.minutes > 0 ? '#10b981' : '#27272a'} 
+                    fill={selectedDay?.dateStr === entry.dateStr ? '#34d399' : (entry.minutes > 0 ? '#10b981' : '#27272a')} 
+                    stroke={selectedDay?.dateStr === entry.dateStr ? '#fff' : 'none'}
+                    strokeWidth={2}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
+
+        <AnimatePresence mode="wait">
+          {selectedDay && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="pt-4 border-t border-zinc-800 overflow-hidden"
+            >
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">
+                    {selectedDay.fullDate}
+                  </div>
+                  <div className="text-lg font-bold text-white">
+                    {selectedDay.minutes}м {selectedDay.seconds}с
+                  </div>
+                </div>
+                <div className="text-right space-y-1">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                    Сессий
+                  </div>
+                  <div className="text-lg font-bold text-white">
+                    {selectedDay.sessionsCount}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!selectedDay && (
+          <div className="flex items-center gap-2 justify-center text-zinc-600 text-[10px] font-bold uppercase tracking-widest animate-pulse">
+            <Info size={10} />
+            Нажми на столбец для деталей
+          </div>
+        )}
       </div>
     </div>
   );

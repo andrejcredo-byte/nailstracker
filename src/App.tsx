@@ -134,7 +134,6 @@ function Dashboard() {
         <Quotes />
         <Timer />
         <LiveSessions />
-        <SocialFeed />
         <PersonalStats />
         <Leaderboard />
       </main>
