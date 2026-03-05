@@ -1,13 +1,15 @@
 export default async function handler(req, res) {
 
-  const update = req.body;
+  const update = typeof req.body === "string"
+    ? JSON.parse(req.body)
+    : req.body
 
-  if (!update.message) {
-    return res.status(200).send("ok");
+  if (!update?.message) {
+    return res.status(200).send("ok")
   }
 
-  const chatId = update.message.chat.id;
-  const text = update.message.text;
+  const chatId = update.message.chat.id
+  const text = update.message.text
 
   if (text === "/start") {
 
@@ -20,9 +22,9 @@ export default async function handler(req, res) {
         chat_id: chatId,
         text: "Нажми кнопку «Старт!» и начни свою практику ⚡️"
       })
-    });
+    })
 
   }
 
-  res.status(200).send("ok");
+  res.status(200).send("ok")
 }
