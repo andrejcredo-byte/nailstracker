@@ -10,6 +10,7 @@ import { LiveSessions } from './components/LiveSessions';
 import { Leaderboard } from './components/Leaderboard';
 import { PersonalStats } from './components/PersonalStats';
 import { SocialFeed } from './components/SocialFeed';
+import { Quotes } from './components/Quotes';
 import { Loader2, Frown, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -121,6 +122,7 @@ function Dashboard() {
 
       <main className="px-6 mt-6 space-y-10">
         <LiveSessions />
+        <Quotes />
         <Timer />
         <SocialFeed />
         <PersonalStats />

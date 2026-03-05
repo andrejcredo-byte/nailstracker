@@ -10,6 +10,7 @@ export interface Session {
   id: string;
   telegram_id: string;
   name: string;
+  photo_url?: string;
   duration_seconds: number;
   intention: string;
   mood: string;

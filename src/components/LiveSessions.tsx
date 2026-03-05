@@ -29,9 +29,15 @@ export const LiveSessions: React.FC = () => {
               } animate-in fade-in zoom-in duration-300`}
             >
               <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold border border-zinc-700 overflow-hidden">
-                  {session.name?.[0] || '?'}
-                </div>
+                <img 
+                  src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
+                  alt={session.name}
+                  className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
+                  }}
+                />
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black animate-pulse" />
               </div>
               
