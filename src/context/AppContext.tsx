@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppData, User, Session } from '../types';
 import { supabase } from '../supabaseClient';
+import { Achievement } from '../constants/achievements';
+import { checkNewAchievements } from '../utils/achievementLogic';
 
 interface AppContextType {
   user: User | null;
@@ -8,6 +10,10 @@ interface AppContextType {
   loading: boolean;
   error: string | null;
   isPracticing: boolean;
+  newlyUnlocked: Achievement[];
+  showAchievements: boolean;
+  setShowAchievements: (show: boolean) => void;
+  clearNewlyUnlocked: () => void;
   refreshData: () => Promise<void>;
   startPractice: (intention: string) => Promise<void>;
   endPractice: (duration: number, intention: string, mood: string) => Promise<void>;
@@ -21,6 +27,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
+  const [showAchievements, setShowAchievements] = useState(false);
+
+  const clearNewlyUnlocked = () => setNewlyUnlocked([]);
 
   const refreshData = async () => {
     try {
@@ -244,6 +254,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       console.log('Session saved and live session removed');
+      
+      // Check for new achievements
+      if (user && !user.is_mock) {
+        const newSessions = [...data.sessions, { 
+          telegram_id: user.id, 
+          duration_seconds: duration, 
+          start_time: new Date().toISOString() 
+        } as any];
+        const unlocked = checkNewAchievements(data.sessions, newSessions, user.id);
+        if (unlocked.length > 0) {
+          console.log('New achievements unlocked:', unlocked);
+          setNewlyUnlocked(unlocked);
+          
+          // Haptic feedback via Telegram WebApp
+          const tg = (window as any).Telegram?.WebApp;
+          if (tg?.HapticFeedback) {
+            tg.HapticFeedback.notificationOccurred('success');
+          }
+        }
+      }
+
       await refreshData();
     } catch (err: any) {
       console.error('Failed to save session to Supabase:', err);
@@ -252,7 +283,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return (
-    <AppContext.Provider value={{ user, data, loading, error, isPracticing, refreshData, startPractice, endPractice }}>
+    <AppContext.Provider value={{ 
+      user, data, loading, error, isPracticing, 
+      newlyUnlocked, showAchievements, setShowAchievements, clearNewlyUnlocked,
+      refreshData, startPractice, endPractice 
+    }}>
       {children}
     </AppContext.Provider>
   );

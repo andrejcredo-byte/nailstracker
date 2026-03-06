@@ -9,9 +9,10 @@ import { Timer } from './components/Timer';
 import { LiveSessions } from './components/LiveSessions';
 import { Leaderboard } from './components/Leaderboard';
 import { PersonalStats } from './components/PersonalStats';
-import { SocialFeed } from './components/SocialFeed';
 import { Quotes } from './components/Quotes';
-import { Loader2, Frown, RefreshCw } from 'lucide-react';
+import { AchievementPopup } from './components/AchievementPopup';
+import { AchievementsScreen } from './components/AchievementsScreen';
+import { Loader2, Frown, RefreshCw, Trophy } from 'lucide-react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode }) {
@@ -53,7 +54,10 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 function Dashboard() {
-  const { user, loading, error, data, refreshData } = useApp();
+  const { 
+    user, loading, error, data, refreshData, 
+    newlyUnlocked, clearNewlyUnlocked, showAchievements, setShowAchievements 
+  } = useApp();
   console.log('Dashboard render:', { hasUser: !!user, loading, hasData: !!data, error });
 
   if (loading) {
@@ -114,6 +118,12 @@ function Dashboard() {
           <p className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase">Energy & Focus</p>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setShowAchievements(true)}
+            className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 active:scale-90 transition-transform"
+          >
+            <Trophy size={20} />
+          </button>
           <div className="text-right hidden xs:block">
             <div className="text-sm font-bold truncate max-w-[120px]">{user.first_name}</div>
             <div className="text-[10px] text-zinc-500 font-mono">@{user.username || 'user'}</div>
@@ -137,6 +147,15 @@ function Dashboard() {
         <PersonalStats />
         <Leaderboard />
       </main>
+
+      {/* Achievements UI */}
+      {showAchievements && <AchievementsScreen />}
+      {newlyUnlocked.length > 0 && (
+        <AchievementPopup 
+          achievements={newlyUnlocked} 
+          onClose={clearNewlyUnlocked} 
+        />
+      )}
 
         </>
       )}
