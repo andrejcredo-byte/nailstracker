@@ -267,13 +267,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.log('New achievements unlocked:', unlocked);
           setNewlyUnlocked(unlocked);
           
-          // Haptic feedback via Telegram WebApp
-          const tg = (window as any).Telegram?.WebApp;
-          if (tg?.HapticFeedback) {
-            tg.HapticFeedback.impactOccurred('heavy');
-            setTimeout(() => {
-              tg.HapticFeedback.notificationOccurred('success');
-            }, 50);
+          // Haptic feedback via Telegram WebApp for iPhone
+          try {
+            const tg = (window as any).Telegram?.WebApp;
+            if (tg?.HapticFeedback) {
+              tg.HapticFeedback.impactOccurred('heavy');
+              setTimeout(() => {
+                tg.HapticFeedback.notificationOccurred('success');
+              }, 100);
+            }
+          } catch (e) {
+            console.error('Haptic error:', e);
           }
         }
       }
