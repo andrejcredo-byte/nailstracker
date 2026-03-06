@@ -36,49 +36,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       console.log('Fetching data from Supabase...');
       
-      // 1. Cleanup stale live sessions (older than 1 minute of inactivity)
-      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+      // 1. Cleanup stale live sessions in BACKGROUND (don't await)
+      const cleanupStale = async () => {
+        try {
+          const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+          await supabase.from("live_sessions").delete().lt('last_ping', oneMinuteAgo);
+          
+          const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+          await supabase.from("live_sessions").delete().is('last_ping', null).lt('start_time', fiveMinsAgo);
+        } catch (e) {
+          console.warn('Background cleanup failed:', e);
+        }
+      };
+      cleanupStale();
+
+      // 2. Fetch data in PARALLEL
+      const [sessionsRes, liveSessionsRes] = await Promise.all([
+        supabase.from("sessions").select("*").order("start_time", { ascending: false }),
+        supabase.from("live_sessions").select("*")
+      ]);
+
+      let sessions = sessionsRes.data;
+      let sessionsError = sessionsRes.error;
       
-      // Delete sessions that haven't pinged in 1 minute
-      await supabase
-        .from("live_sessions")
-        .delete()
-        .lt('last_ping', oneMinuteAgo);
-
-      // Fallback: delete sessions with null last_ping that started more than 5 mins ago
-      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      await supabase
-        .from("live_sessions")
-        .delete()
-        .is('last_ping', null)
-        .lt('start_time', fiveMinsAgo);
-
-      // 2. Fetch completed sessions
-      let { data: sessions, error: sessionsError } = await supabase
-        .from("sessions")
-        .select("*")
-        .order("start_time", { ascending: false });
-
       if (sessionsError) {
         console.error('Supabase sessions fetch error:', sessionsError);
-        // If start_time is missing, try fetching without order
         if (sessionsError.message.includes('start_time')) {
           const { data: retrySessions, error: retryError } = await supabase.from("sessions").select("*");
           if (!retryError && retrySessions) {
             sessions = retrySessions;
-            sessionsError = null; // Clear error if retry worked
+            sessionsError = null;
           }
-        }
-        
-        if (sessionsError) {
-          setError(`Ошибка загрузки сессий: ${sessionsError.message}`);
         }
       }
 
-      // 3. Fetch live sessions
-      const { data: liveSessions, error: liveError } = await supabase
-        .from("live_sessions")
-        .select("*");
+      const liveSessions = liveSessionsRes.data;
+      const liveError = liveSessionsRes.error;
 
       let liveErrorMsg: string | null = null;
       if (liveError) {
@@ -91,9 +84,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       console.log(`Fetched ${sessions?.length || 0} sessions and ${liveSessions?.length || 0} live sessions`);
-      if (liveSessions && liveSessions.length > 0) {
-        console.log('Current live sessions:', liveSessions);
-      }
       
       setData({
         sessions: sessions || [],
