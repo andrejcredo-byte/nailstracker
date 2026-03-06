@@ -4,10 +4,16 @@ import { useApp } from '../context/AppContext';
 import { formatDuration } from '../utils';
 import { Sword, Users, Trophy, Share2, RefreshCw, Loader2 } from 'lucide-react';
 
+const BOT_CONFIG = {
+  username: 'nailstrackerbot',
+  appShortName: 'app' // Если в BotFather вы указали другое Short Name, измените его здесь
+};
+
 export const Challenges: React.FC = () => {
-  const { user, data, refreshData, createChallenge, acceptChallenge } = useApp();
+  const { user, data, refreshData, createChallenge, acceptChallenge, leaveChallenge } = useApp();
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [createdChallengeId, setCreatedChallengeId] = useState<string | null>(null);
 
   const myChallenges = useMemo(() => {
     if (!user) return [];
@@ -31,9 +37,9 @@ export const Challenges: React.FC = () => {
     setLoading(true);
     try {
       const challengeId = await createChallenge();
+      setCreatedChallengeId(challengeId);
       
-      const botUsername = 'nailstrackerbot'; 
-      const shareUrl = `https://t.me/${botUsername}/app?startapp=challenge_${challengeId}`;
+      const shareUrl = `https://t.me/${BOT_CONFIG.username}/${BOT_CONFIG.appShortName}?startapp=challenge_${challengeId}`;
       
       const messageText = `🔥 ВЫЗОВ ПРИНЯТ? 🔥\n\nЯ вызываю тебя на 7-дневную битву в Sadhu Tracker! 🧘‍♂️🦶\n\nДавай узнаем, кто из нас сильнее духом и сможет простоять на гвоздях дольше за эту неделю. Победитель забирает всё! 🏆\n\nПринимай вызов по ссылке:\n${shareUrl}`;
       
@@ -67,8 +73,7 @@ export const Challenges: React.FC = () => {
   };
 
   const copyChallengeLink = async (id: string) => {
-    const botUsername = 'nailstrackerbot';
-    const shareUrl = `https://t.me/${botUsername}/app?startapp=challenge_${id}`;
+    const shareUrl = `https://t.me/${BOT_CONFIG.username}/${BOT_CONFIG.appShortName}?startapp=challenge_${id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       const tg = (window as any).Telegram?.WebApp;
@@ -77,6 +82,25 @@ export const Challenges: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleLeaveChallenge = async (id: string) => {
+    const tg = (window as any).Telegram?.WebApp;
+    const confirmed = window.confirm('Ты уверен, что хочешь досрочно завершить этот челлендж?');
+    
+    if (confirmed) {
+      try {
+        setLoading(true);
+        await leaveChallenge(id);
+        if (tg?.HapticFeedback) {
+          tg.HapticFeedback.notificationOccurred('warning');
+        }
+      } catch (e) {
+        console.error('Failed to leave challenge:', e);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -134,6 +158,15 @@ export const Challenges: React.FC = () => {
             {formatDuration(Math.abs(diff))}
           </div>
         </div>
+
+        <button 
+          onClick={() => handleLeaveChallenge(activeChallenge.id)}
+          disabled={loading}
+          className="w-full py-3 bg-black/10 hover:bg-black/20 text-black rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Завершить челлендж
+        </button>
       </motion.div>
     );
   }
@@ -279,19 +312,33 @@ export const Challenges: React.FC = () => {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowCreate(false)}
+                onClick={() => {
+                  setShowCreate(false);
+                  setCreatedChallengeId(null);
+                }}
                 className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold"
               >
-                Отмена
+                {createdChallengeId ? 'Закрыть' : 'Отмена'}
               </button>
-              <button
-                onClick={handleCreateChallenge}
-                disabled={loading}
-                className="flex-[2] py-4 bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 className="animate-spin" size={20} /> : <Share2 size={20} />}
-                {loading ? 'Создаем...' : 'Отправить вызов'}
-              </button>
+              
+              {createdChallengeId ? (
+                <button
+                  onClick={() => copyChallengeLink(createdChallengeId)}
+                  className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
+                >
+                  <Share2 size={20} />
+                  Копировать ссылку
+                </button>
+              ) : (
+                <button
+                  onClick={handleCreateChallenge}
+                  disabled={loading}
+                  className="flex-[2] py-4 bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={20} /> : <Share2 size={20} />}
+                  {loading ? 'Создаем...' : 'Отправить вызов'}
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

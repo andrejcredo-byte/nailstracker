@@ -21,6 +21,7 @@ interface AppContextType {
   endPractice: (duration: number, intention: string, mood: string) => Promise<void>;
   createChallenge: () => Promise<string>;
   acceptChallenge: (challengeId: string) => Promise<void>;
+  leaveChallenge: (challengeId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -380,6 +381,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await refreshData();
   };
 
+  const leaveChallenge = async (challengeId: string) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("challenges")
+      .update({ status: 'completed' })
+      .eq('id', challengeId);
+
+    if (error) throw error;
+    await refreshData();
+  };
+
   // Add a helper to check for expired challenges
   useEffect(() => {
     if (data.challenges && data.challenges.length > 0) {
@@ -408,7 +421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       user, data, loading, error, isPracticing, 
       newlyUnlocked, newPersonalBest, showAchievements, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
-      refreshData, startPractice, endPractice, createChallenge, acceptChallenge
+      refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge
     }}>
       {children}
     </AppContext.Provider>
