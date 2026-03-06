@@ -19,8 +19,24 @@ export interface Session {
   start_time: string;
 }
 
+export interface Challenge {
+  id: string;
+  creator_id: string;
+  opponent_id: string | null;
+  creator_name: string;
+  opponent_name: string | null;
+  creator_photo: string;
+  opponent_photo: string | null;
+  status: 'pending' | 'active' | 'completed';
+  start_date: string;
+  end_date: string;
+  creator_total_seconds: number;
+  opponent_total_seconds: number;
+}
+
 export interface AppData {
   sessions: Session[];
   live_sessions?: any[];
+  challenges?: Challenge[];
   live_error?: string | null;
 }

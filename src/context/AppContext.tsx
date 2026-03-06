@@ -11,26 +11,32 @@ interface AppContextType {
   error: string | null;
   isPracticing: boolean;
   newlyUnlocked: Achievement[];
+  newPersonalBest: number | null;
   showAchievements: boolean;
   setShowAchievements: (show: boolean) => void;
   clearNewlyUnlocked: () => void;
+  clearNewPersonalBest: () => void;
   refreshData: () => Promise<void>;
   startPractice: (intention: string) => Promise<void>;
   endPractice: (duration: number, intention: string, mood: string) => Promise<void>;
+  createChallenge: () => Promise<string>;
+  acceptChallenge: (challengeId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData>({ sessions: [] });
+  const [data, setData] = useState<AppData>({ sessions: [], challenges: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
+  const [newPersonalBest, setNewPersonalBest] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(false);
 
   const clearNewlyUnlocked = () => setNewlyUnlocked([]);
+  const clearNewPersonalBest = () => setNewPersonalBest(null);
 
   const refreshData = async () => {
     try {
@@ -51,9 +57,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cleanupStale();
 
       // 2. Fetch data in PARALLEL
-      const [sessionsRes, liveSessionsRes] = await Promise.all([
+      const [sessionsRes, liveSessionsRes, challengesRes] = await Promise.all([
         supabase.from("sessions").select("*").order("start_time", { ascending: false }),
-        supabase.from("live_sessions").select("*")
+        supabase.from("live_sessions").select("*"),
+        supabase.from("challenges").select("*")
       ]);
 
       let sessions = sessionsRes.data;
@@ -72,6 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const liveSessions = liveSessionsRes.data;
       const liveError = liveSessionsRes.error;
+      const challenges = challengesRes.data || [];
 
       let liveErrorMsg: string | null = null;
       if (liveError) {
@@ -83,11 +91,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      console.log(`Fetched ${sessions?.length || 0} sessions and ${liveSessions?.length || 0} live sessions`);
+      console.log(`Fetched ${sessions?.length || 0} sessions, ${liveSessions?.length || 0} live sessions, ${challenges.length} challenges`);
       
       setData({
         sessions: sessions || [],
         live_sessions: liveSessions || [],
+        challenges: challenges,
         live_error: liveErrorMsg
       });
       setError(null);
@@ -213,6 +222,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       console.log('Saving session to Supabase...', { telegram_id: user.id, duration });
       
+      // Check for personal best BEFORE saving
+      const userSessions = data.sessions.filter(s => s.telegram_id === user.id);
+      const previousBest = userSessions.length > 0 
+        ? Math.max(...userSessions.map(s => s.duration_seconds)) 
+        : 0;
+
+      if (duration > previousBest && previousBest > 0) {
+        setNewPersonalBest(duration);
+      }
+
       // 1. Insert into completed sessions
       const { error: insertError } = await supabase
         .from("sessions")
@@ -243,32 +262,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Supabase live_sessions delete error:', deleteError);
       }
 
+      // 3. Update active challenges
+      const activeChallenges = (data.challenges || []).filter(c => 
+        c.status === 'active' && (c.creator_id === user.id || c.opponent_id === user.id)
+      );
+
+      for (const challenge of activeChallenges) {
+        const isCreator = challenge.creator_id === user.id;
+        const updateData = isCreator 
+          ? { creator_total_seconds: challenge.creator_total_seconds + duration }
+          : { opponent_total_seconds: challenge.opponent_total_seconds + duration };
+        
+        await supabase.from("challenges").update(updateData).eq('id', challenge.id);
+      }
+
       console.log('Session saved and live session removed');
       
       // Check for new achievements
-      if (user && !user.is_mock) {
-        const newSessions = [...data.sessions, { 
-          telegram_id: user.id, 
-          duration_seconds: duration, 
-          start_time: new Date().toISOString() 
-        } as any];
-        const unlocked = checkNewAchievements(data.sessions, newSessions, user.id);
-        if (unlocked.length > 0) {
-          console.log('New achievements unlocked:', unlocked);
-          setNewlyUnlocked(unlocked);
-          
-          // Haptic feedback via Telegram WebApp for iPhone
-          try {
-            const tg = (window as any).Telegram?.WebApp;
-            if (tg?.HapticFeedback) {
-              tg.HapticFeedback.impactOccurred('heavy');
-              setTimeout(() => {
-                tg.HapticFeedback.notificationOccurred('success');
-              }, 100);
-            }
-          } catch (e) {
-            console.error('Haptic error:', e);
+      const newSessions = [...data.sessions, { 
+        telegram_id: user.id, 
+        duration_seconds: duration, 
+        start_time: new Date().toISOString() 
+      } as any];
+      const unlocked = checkNewAchievements(data.sessions, newSessions, user.id);
+      if (unlocked.length > 0) {
+        console.log('New achievements unlocked:', unlocked);
+        setNewlyUnlocked(unlocked);
+        
+        // Haptic feedback via Telegram WebApp for iPhone
+        try {
+          const tg = (window as any).Telegram?.WebApp;
+          if (tg?.HapticFeedback) {
+            tg.HapticFeedback.impactOccurred('heavy');
+            setTimeout(() => {
+              tg.HapticFeedback.notificationOccurred('success');
+            }, 100);
           }
+        } catch (e) {
+          console.error('Haptic error:', e);
         }
       }
 
@@ -279,11 +310,97 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const createChallenge = async () => {
+    if (!user) return '';
+    // More robust unique ID: timestamp + random string
+    const challengeId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 7);
+
+    const { error: challengeError } = await supabase
+      .from("challenges")
+      .insert({
+        id: challengeId,
+        creator_id: user.id,
+        creator_name: user.first_name,
+        creator_photo: user.photo,
+        opponent_id: null,
+        opponent_name: null,
+        opponent_photo: null,
+        status: 'pending',
+        start_date: new Date().toISOString(),
+        end_date: endDate.toISOString(),
+        creator_total_seconds: 0,
+        opponent_total_seconds: 0
+      });
+
+    if (challengeError) throw challengeError;
+    return challengeId;
+  };
+
+  const acceptChallenge = async (challengeId: string) => {
+    if (!user) return;
+    
+    // 1. Fetch challenge to check if it's yours
+    const { data: challenge, error: fetchError } = await supabase
+      .from("challenges")
+      .select("*")
+      .eq('id', challengeId)
+      .single();
+
+    if (fetchError || !challenge) throw new Error('Челлендж не найден');
+    if (challenge.creator_id === user.id) {
+      console.log('Cannot accept your own challenge');
+      return; // Silently ignore or you could throw an error
+    }
+    if (challenge.status !== 'pending') {
+      console.log('Challenge is no longer pending');
+      return;
+    }
+
+    const { error: challengeError } = await supabase
+      .from("challenges")
+      .update({
+        opponent_id: user.id,
+        opponent_name: user.first_name,
+        opponent_photo: user.photo,
+        status: 'active'
+      })
+      .eq('id', challengeId);
+
+    if (challengeError) throw challengeError;
+    await refreshData();
+  };
+
+  // Add a helper to check for expired challenges
+  useEffect(() => {
+    if (data.challenges && data.challenges.length > 0) {
+      const checkExpirations = async () => {
+        const now = new Date();
+        const expired = data.challenges!.filter(c => 
+          c.status === 'active' && new Date(c.end_date) < now
+        );
+
+        for (const challenge of expired) {
+          await supabase
+            .from("challenges")
+            .update({ status: 'completed' })
+            .eq('id', challenge.id);
+        }
+        
+        if (expired.length > 0) {
+          await refreshData();
+        }
+      };
+      checkExpirations();
+    }
+  }, [data.challenges]);
+
   return (
     <AppContext.Provider value={{ 
       user, data, loading, error, isPracticing, 
-      newlyUnlocked, showAchievements, setShowAchievements, clearNewlyUnlocked,
-      refreshData, startPractice, endPractice 
+      newlyUnlocked, newPersonalBest, showAchievements, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
+      refreshData, startPractice, endPractice, createChallenge, acceptChallenge
     }}>
       {children}
     </AppContext.Provider>

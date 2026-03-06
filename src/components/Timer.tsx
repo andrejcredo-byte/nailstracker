@@ -13,6 +13,49 @@ export const Timer: React.FC = () => {
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [intention, setIntention] = useState('');
   const timerRef = useRef<any>(null);
+  const wakeLockRef = useRef<any>(null);
+
+  const activeChallenge = data.challenges?.find(c => c.status === 'active' && (c.creator_id === user?.id || c.opponent_id === user?.id));
+
+  // Screen Wake Lock logic
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+          console.log('Screen Wake Lock is active');
+        } catch (err: any) {
+          console.error(`${err.name}, ${err.message}`);
+        }
+      }
+    };
+
+    if (isPracticing && !isPaused) {
+      requestWakeLock();
+      
+      // Re-request wake lock if page becomes visible again
+      const handleVisibilityChange = () => {
+        if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    } else {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().then(() => {
+          wakeLockRef.current = null;
+          console.log('Screen Wake Lock released');
+        });
+      }
+    }
+
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+      }
+    };
+  }, [isPracticing, isPaused]);
 
   useEffect(() => {
     const liveSessions = (data?.live_sessions || []);
@@ -41,7 +84,17 @@ export const Timer: React.FC = () => {
     let interval: any;
     if (isPracticing && !isPaused) {
       interval = setInterval(() => {
-        setSeconds(s => s + 1);
+        setSeconds(s => {
+          const newSeconds = s + 1;
+          // Haptic feedback every minute
+          if (newSeconds > 0 && newSeconds % 60 === 0) {
+            const tg = (window as any).Telegram?.WebApp;
+            if (tg?.HapticFeedback) {
+              tg.HapticFeedback.notificationOccurred('success');
+            }
+          }
+          return newSeconds;
+        });
       }, 1000);
     }
     return () => {
@@ -129,7 +182,13 @@ export const Timer: React.FC = () => {
           НАЧАТЬ ПРАКТИКУ
         </button>
       ) : (
-        <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center space-y-6">
+        <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 flex flex-col items-center space-y-6 relative overflow-hidden">
+          {activeChallenge && (
+            <div className="absolute top-0 right-0 bg-emerald-500 text-black px-4 py-1 rounded-bl-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+              <Sparkles size={10} />
+              Битва активна
+            </div>
+          )}
           <div className="text-zinc-500 uppercase tracking-widest text-xs font-bold">Текущая практика</div>
           <div className="text-7xl font-mono font-bold tracking-tighter tabular-nums">
             {formatDuration(seconds)}

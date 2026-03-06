@@ -12,7 +12,11 @@ import { PersonalStats } from './components/PersonalStats';
 import { Quotes } from './components/Quotes';
 import { AchievementPopup } from './components/AchievementPopup';
 import { AchievementsScreen } from './components/AchievementsScreen';
-import { Loader2, Frown, RefreshCw, Trophy } from 'lucide-react';
+import { Heatmap } from './components/Heatmap';
+import { Challenges } from './components/Challenges';
+import { PersonalBestPopup } from './components/PersonalBestPopup';
+import { Loader2, Frown, RefreshCw, Trophy, Sword } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
   constructor(props: { children: React.ReactNode }) {
@@ -56,33 +60,83 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function Dashboard() {
   const { 
     user, loading, error, data, refreshData, 
-    newlyUnlocked, clearNewlyUnlocked, showAchievements, setShowAchievements 
+    newlyUnlocked, clearNewlyUnlocked, showAchievements, setShowAchievements,
+    newPersonalBest, clearNewPersonalBest, acceptChallenge
   } = useApp();
-  console.log('Dashboard render:', { hasUser: !!user, loading, hasData: !!data, error });
+
+  React.useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    const params = new URLSearchParams(window.location.search);
+    
+    // Check both URL and Telegram start_param
+    const challengeId = params.get('challenge') || tg?.initDataUnsafe?.start_param;
+    
+    if (challengeId && user && !user.is_mock) {
+      // If it's a Telegram start_param, it might be prefixed (e.g. challenge_abc123)
+      const cleanId = challengeId.startsWith('challenge_') 
+        ? challengeId.replace('challenge_', '') 
+        : challengeId;
+
+      acceptChallenge(cleanId).then(() => {
+        // Clear param from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Show success notification via Telegram
+        if (tg?.showAlert) {
+          tg.showAlert('Вызов принят! Битва началась.');
+        }
+      }).catch(err => {
+        console.error('Challenge accept error:', err);
+        if (tg?.showAlert) {
+          tg.showAlert('Не удалось принять вызов. Возможно, он уже неактивен.');
+        }
+      });
+    }
+  }, [user]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 space-y-4">
-        <Loader2 className="animate-spin text-emerald-500" size={40} />
-        <p className="text-zinc-500 font-medium animate-pulse tracking-wide">Загружаем твою энергию...</p>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+        >
+          <Loader2 className="text-emerald-500" size={40} />
+        </motion.div>
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]"
+        >
+          Загружаем твою энергию...
+        </motion.p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pb-12 overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white pb-12 overflow-x-hidden selection:bg-emerald-500 selection:text-black">
       {/* Error Toast */}
-      {error && (
-        <div className="fixed top-20 left-6 right-6 z-50 bg-red-500 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-3">
-            <Frown size={20} />
-            <span className="text-sm font-bold">{error}</span>
-          </div>
-          <button onClick={() => window.location.reload()} className="p-1 hover:bg-white/20 rounded-lg">
-            <RefreshCw size={16} />
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 left-6 right-6 z-50 bg-red-500 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Frown size={20} />
+              <span className="text-sm font-bold">{error}</span>
+            </div>
+            <button onClick={() => window.location.reload()} className="p-1 hover:bg-white/20 rounded-lg">
+              <RefreshCw size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Preview Mode Banner */}
       {user.is_mock && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center justify-center gap-2">
@@ -112,51 +166,84 @@ function Dashboard() {
         </div>
       ) : (
         <>
-          <header className="p-6 flex items-center justify-between sticky top-0 bg-black z-40 border-b border-zinc-900">
-        <div className="space-y-0.5">
-          <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Sadhu Tracker</h1>
-          <p className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase">Energy & Focus</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setShowAchievements(true)}
-            className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 active:scale-90 transition-transform"
-          >
-            <Trophy size={20} />
-          </button>
-          <div className="text-right hidden xs:block">
-            <div className="text-sm font-bold truncate max-w-[120px]">{user.first_name}</div>
-            <div className="text-[10px] text-zinc-500 font-mono">@{user.username || 'user'}</div>
-          </div>
-          <img 
-            src={user.photo} 
-            alt={user.first_name} 
-            className="w-10 h-10 rounded-full border-2 border-zinc-800 object-cover"
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name)}&background=random`;
-            }}
-          />
-        </div>
-      </header>
+          <header className="p-6 flex items-center justify-between sticky top-0 bg-black/80 backdrop-blur-xl z-40 border-b border-zinc-900">
+            <div className="space-y-0.5">
+              <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Sadhu Tracker</h1>
+              <p className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase">Energy & Focus</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setShowAchievements(true)}
+                className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 active:scale-90 transition-transform"
+              >
+                <Trophy size={20} />
+              </button>
+              <div className="text-right hidden xs:block">
+                <div className="text-sm font-bold truncate max-w-[120px]">{user.first_name}</div>
+                <div className="text-[10px] text-zinc-500 font-mono">@{user.username || 'user'}</div>
+              </div>
+              <img 
+                src={user.photo} 
+                alt={user.first_name} 
+                className="w-10 h-10 rounded-full border-2 border-zinc-800 object-cover"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.first_name)}&background=random`;
+                }}
+              />
+            </div>
+          </header>
 
-      <main className="px-6 mt-6 space-y-10">
-        <Quotes />
-        <Timer />
-        <LiveSessions />
-        <PersonalStats />
-        <Leaderboard />
-      </main>
+          <main className="px-6 mt-6 space-y-8">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+              <Quotes />
+            </motion.div>
+            
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <Timer />
+            </motion.div>
 
-      {/* Achievements UI */}
-      {showAchievements && <AchievementsScreen />}
-      {newlyUnlocked.length > 0 && (
-        <AchievementPopup 
-          achievements={newlyUnlocked} 
-          onClose={clearNewlyUnlocked} 
-        />
-      )}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <Heatmap />
+            </motion.div>
 
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+              <Challenges />
+            </motion.div>
+            
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+              <LiveSessions />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+              <PersonalStats />
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+              <Leaderboard />
+            </motion.div>
+          </main>
+
+          {/* Popups */}
+          <AnimatePresence>
+            {showAchievements && <AchievementsScreen key="achievements" />}
+            
+            {newlyUnlocked.length > 0 && (
+              <AchievementPopup 
+                key="achievement-popup"
+                achievements={newlyUnlocked} 
+                onClose={clearNewlyUnlocked} 
+              />
+            )}
+
+            {newPersonalBest && (
+              <PersonalBestPopup 
+                key="pb-popup"
+                duration={newPersonalBest}
+                onClose={clearNewPersonalBest}
+              />
+            )}
+          </AnimatePresence>
         </>
       )}
 
