@@ -107,32 +107,32 @@ export const Quotes: React.FC = () => {
   };
 
   return (
-    <div className="bg-zinc-900/40 rounded-3xl p-5 border border-zinc-800/50 relative overflow-hidden group">
-      <div className="absolute -top-2 -left-2 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors">
-        <Quote size={80} />
+    <div className="bg-zinc-900/40 rounded-3xl p-3 px-4 border border-zinc-800/50 relative overflow-hidden group">
+      <div className="absolute -top-1 -left-1 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors">
+        <Quote size={40} />
       </div>
       
-      <div className="relative z-10 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-zinc-600">
-            <Quote size={12} />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em]">Мудрость дня</span>
+      <div className="relative z-10 space-y-1">
+        <div className="flex items-center justify-between opacity-50">
+          <div className="flex items-center gap-1.5 text-zinc-600">
+            <Quote size={8} />
+            <span className="text-[7px] font-bold uppercase tracking-[0.2em]">Мудрость дня</span>
           </div>
           <button 
             onClick={nextQuote}
-            className="p-1.5 hover:bg-white/5 rounded-full text-zinc-600 hover:text-white transition-colors"
+            className="p-1 hover:bg-white/5 rounded-full text-zinc-600 hover:text-white transition-colors"
           >
-            <RefreshCw size={12} />
+            <RefreshCw size={8} />
           </button>
         </div>
 
         <AnimatePresence mode="wait">
           <motion.p 
             key={quoteIdx}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            className="text-sm font-medium text-zinc-300 leading-snug italic px-1"
+            initial={{ opacity: 0, x: -5 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 5 }}
+            className="text-xl font-black text-white leading-none italic tracking-tighter"
           >
             «{QUOTES[quoteIdx]}»
           </motion.p>
