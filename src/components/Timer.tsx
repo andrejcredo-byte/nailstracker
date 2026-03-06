@@ -51,6 +51,13 @@ export const Timer: React.FC = () => {
 
   const handleStart = () => {
     if (!intention.trim()) return;
+    
+    // Haptic feedback on start
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.impactOccurred('light');
+    }
+
     const currentIntention = intention;
     setShowIntentionModal(false);
     setIsPracticing(true);
@@ -81,7 +88,11 @@ export const Timer: React.FC = () => {
     // Trigger haptic feedback
     const tg = (window as any).Telegram?.WebApp;
     if (tg?.HapticFeedback) {
-      tg.HapticFeedback.notificationOccurred('success');
+      tg.HapticFeedback.impactOccurred('medium');
+      // Also try notification for good measure if supported
+      setTimeout(() => {
+        tg.HapticFeedback.notificationOccurred('success');
+      }, 50);
     }
 
     // Не ждем завершения сетевого запроса, закрываем модалку сразу

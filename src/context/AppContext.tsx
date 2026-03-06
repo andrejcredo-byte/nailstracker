@@ -270,7 +270,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Haptic feedback via Telegram WebApp
           const tg = (window as any).Telegram?.WebApp;
           if (tg?.HapticFeedback) {
-            tg.HapticFeedback.notificationOccurred('success');
+            tg.HapticFeedback.impactOccurred('heavy');
+            setTimeout(() => {
+              tg.HapticFeedback.notificationOccurred('success');
+            }, 50);
           }
         }
       }
