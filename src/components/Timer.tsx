@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, Pause, Smile, Meh, Frown, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatDuration } from '../utils';
+import confetti from 'canvas-confetti';
 
 export const Timer: React.FC = () => {
   const { user, data, startPractice, endPractice } = useApp();
@@ -69,6 +70,20 @@ export const Timer: React.FC = () => {
   };
 
   const submitPractice = (mood: string) => {
+    // Trigger confetti
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#10b981', '#34d399', '#ffffff']
+    });
+
+    // Trigger haptic feedback
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.HapticFeedback) {
+      tg.HapticFeedback.notificationOccurred('success');
+    }
+
     // Не ждем завершения сетевого запроса, закрываем модалку сразу
     const currentSeconds = seconds;
     const currentIntention = intention;
