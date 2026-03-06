@@ -52,10 +52,14 @@ export const Timer: React.FC = () => {
   const handleStart = () => {
     if (!intention.trim()) return;
     
-    // Haptic feedback on start
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg?.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred('light');
+    // Haptic feedback on start for iPhone
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+      }
+    } catch (e) {
+      console.error('Haptic error:', e);
     }
 
     const currentIntention = intention;
@@ -85,14 +89,17 @@ export const Timer: React.FC = () => {
       colors: ['#10b981', '#34d399', '#ffffff']
     });
 
-    // Trigger haptic feedback
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg?.HapticFeedback) {
-      tg.HapticFeedback.impactOccurred('medium');
-      // Also try notification for good measure if supported
-      setTimeout(() => {
-        tg.HapticFeedback.notificationOccurred('success');
-      }, 50);
+    // Trigger heavy haptic feedback for iPhone
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('heavy');
+        setTimeout(() => {
+          tg.HapticFeedback.notificationOccurred('success');
+        }, 100);
+      }
+    } catch (e) {
+      console.error('Haptic error:', e);
     }
 
     // Не ждем завершения сетевого запроса, закрываем модалку сразу
