@@ -77,22 +77,28 @@ function Dashboard() {
         ? challengeId.replace('challenge_', '') 
         : challengeId;
 
+      // Check if we already handled this ID to avoid infinite loops
+      const hasHandled = sessionStorage.getItem(`handled_challenge_${cleanId}`);
+      if (hasHandled) return;
+
       acceptChallenge(cleanId).then(() => {
+        sessionStorage.setItem(`handled_challenge_${cleanId}`, 'true');
         // Clear param from URL
         window.history.replaceState({}, document.title, window.location.pathname);
         
         // Show success notification via Telegram
         if (tg?.showAlert) {
-          tg.showAlert('Вызов принят! Битва началась.');
+          tg.showAlert('Вызов принят! Битва началась. ⚔️');
         }
       }).catch(err => {
         console.error('Challenge accept error:', err);
+        // Only show error if it's not "already accepted" or similar
         if (tg?.showAlert) {
-          tg.showAlert('Не удалось принять вызов. Возможно, он уже неактивен.');
+          tg.showAlert('Не удалось принять вызов. Возможно, он уже неактивен или ты уже в битве.');
         }
       });
     }
-  }, [user]);
+  }, [loading, user]);
 
   if (loading) {
     return (

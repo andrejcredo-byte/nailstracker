@@ -349,13 +349,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .single();
 
     if (fetchError || !challenge) throw new Error('Челлендж не найден');
+    
+    // If user is already the opponent, just refresh and return
+    if (challenge.opponent_id === user.id) {
+      await refreshData();
+      return;
+    }
+
     if (challenge.creator_id === user.id) {
       console.log('Cannot accept your own challenge');
-      return; // Silently ignore or you could throw an error
-    }
-    if (challenge.status !== 'pending') {
-      console.log('Challenge is no longer pending');
       return;
+    }
+    
+    if (challenge.status !== 'pending') {
+      // If it's already active but not with us, we can't join
+      throw new Error('Этот вызов уже принят кем-то другим');
     }
 
     const { error: challengeError } = await supabase
