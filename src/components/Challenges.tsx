@@ -5,7 +5,7 @@ import { formatDuration } from '../utils';
 import { Sword, Users, Trophy, Share2, RefreshCw, Loader2 } from 'lucide-react';
 
 export const Challenges: React.FC = () => {
-  const { user, data, refreshData } = useApp();
+  const { user, data, refreshData, createChallenge, acceptChallenge } = useApp();
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -30,7 +30,7 @@ export const Challenges: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const challengeId = await useApp().createChallenge();
+      const challengeId = await createChallenge();
       
       const botUsername = 'nailstrackerbot'; 
       const shareUrl = `https://t.me/${botUsername}/app?startapp=challenge_${challengeId}`;
@@ -182,7 +182,7 @@ export const Challenges: React.FC = () => {
                     <Share2 size={16} />
                   </button>
                   <button 
-                    onClick={() => useApp().acceptChallenge(challenge.id)}
+                    onClick={() => acceptChallenge(challenge.id)}
                     className="px-4 py-2 bg-indigo-500 text-white rounded-xl text-xs font-bold active:scale-95 transition-transform"
                   >
                     Принять
