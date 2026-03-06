@@ -35,18 +35,24 @@ export const Challenges: React.FC = () => {
       const botUsername = 'nailstrackerbot'; 
       const shareUrl = `https://t.me/${botUsername}/app?startapp=challenge_${challengeId}`;
       
-      const messageText = `🔥 ВЫЗОВ ПРИНЯТ? 🔥\n\nЯ вызываю тебя на 7-дневную битву в Sadhu Tracker! 🧘‍♂️🦶\n\nДавай узнаем, кто из нас сильнее духом и сможет простоять на гвоздях дольше за эту неделю. Победитель забирает всё! 🏆`;
+      const messageText = `🔥 ВЫЗОВ ПРИНЯТ? 🔥\n\nЯ вызываю тебя на 7-дневную битву в Sadhu Tracker! 🧘‍♂️🦶\n\nДавай узнаем, кто из нас сильнее духом и сможет простоять на гвоздях дольше за эту неделю. Победитель забирает всё! 🏆\n\nПринимай вызов по ссылке:\n${shareUrl}`;
       
-      const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(messageText)}`;
+      // We put everything in 'text' and leave 'url' empty to keep the link at the bottom
+      const telegramShareUrl = `https://t.me/share/url?url=&text=${encodeURIComponent(messageText)}`;
       
       const tg = (window as any).Telegram?.WebApp;
       
+      if (tg?.showAlert) {
+        tg.showAlert('Вызов создан! Сейчас откроется список контактов — выбери друга, которому хочешь бросить вызов. 🔥');
+      }
+
       // Haptic feedback for "Heavy" action
       if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('heavy');
       }
 
       if (tg?.openTelegramLink) {
+        // Use openTelegramLink to prevent browser redirect
         tg.openTelegramLink(telegramShareUrl);
       } else {
         window.open(telegramShareUrl, '_blank');
