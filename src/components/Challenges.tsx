@@ -6,11 +6,11 @@ import { Sword, Users, Trophy, Share2, RefreshCw, Loader2 } from 'lucide-react';
 
 const BOT_CONFIG = {
   username: 'nailstrackerbot',
-  appShortName: 'app' // Если в BotFather вы указали другое Short Name, измените его здесь
+  appShortName: 'app'
 };
 
 export const Challenges: React.FC = () => {
-  const { user, data, refreshData, createChallenge, acceptChallenge, leaveChallenge } = useApp();
+  const { user, data, createChallenge, acceptChallenge, leaveChallenge } = useApp();
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createdChallengeId, setCreatedChallengeId] = useState<string | null>(null);
@@ -40,30 +40,21 @@ export const Challenges: React.FC = () => {
       setCreatedChallengeId(challengeId);
       
       const shareUrl = `https://t.me/${BOT_CONFIG.username}/${BOT_CONFIG.appShortName}?startapp=challenge_${challengeId}`;
-      
       const messageText = `🔥 ВЫЗОВ ПРИНЯТ? 🔥\n\nЯ вызываю тебя на 7-дневную битву в Sadhu Tracker! 🧘‍♂️🦶\n\nДавай узнаем, кто из нас сильнее духом и сможет простоять на гвоздях дольше за эту неделю. Победитель забирает всё! 🏆\n\nПринимай вызов по ссылке:\n${shareUrl}`;
-      
-      // We put everything in 'text' and leave 'url' empty to keep the link at the bottom
       const telegramShareUrl = `https://t.me/share/url?url=&text=${encodeURIComponent(messageText)}`;
       
       const tg = (window as any).Telegram?.WebApp;
-      
       if (tg?.showAlert) {
         tg.showAlert('Вызов создан! Сейчас откроется список контактов — выбери друга, которому хочешь бросить вызов. 🔥');
       }
-
-      // Haptic feedback for "Heavy" action
       if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('heavy');
       }
-
       if (tg?.openTelegramLink) {
-        // Use openTelegramLink to prevent browser redirect
         tg.openTelegramLink(telegramShareUrl);
       } else {
         window.open(telegramShareUrl, '_blank');
       }
-      
       setShowCreate(false);
     } catch (e) {
       console.error('Failed to create challenge:', e);
@@ -88,7 +79,6 @@ export const Challenges: React.FC = () => {
   const handleLeaveChallenge = async (id: string) => {
     const tg = (window as any).Telegram?.WebApp;
     const confirmed = window.confirm('Ты уверен, что хочешь досрочно завершить этот челлендж?');
-    
     if (confirmed) {
       try {
         setLoading(true);
@@ -140,9 +130,7 @@ export const Challenges: React.FC = () => {
             <div className="text-xs font-bold truncate">Я</div>
             <div className="text-xl font-black tracking-tighter">{formatDuration(myTotal)}</div>
           </div>
-          
           <div className="text-2xl font-black italic opacity-20">VS</div>
-
           <div className="flex-1 text-center space-y-2">
             <img src={opponentPhoto || ''} alt="Opponent" className="w-16 h-16 rounded-full border-4 border-black/10 mx-auto object-cover" />
             <div className="text-xs font-bold truncate">{opponentName || 'Оппонент'}</div>
@@ -179,7 +167,7 @@ export const Challenges: React.FC = () => {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center border border-indigo-500/20">
+          <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center border border-emerald-500/20">
             <Users size={20} />
           </div>
           <div>
@@ -189,7 +177,7 @@ export const Challenges: React.FC = () => {
         </div>
         <button 
           onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition-colors"
+          className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-xs font-bold hover:bg-emerald-600 transition-colors"
         >
           Вызвать друга
         </button>
@@ -205,7 +193,7 @@ export const Challenges: React.FC = () => {
           >
             <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Входящие вызовы</div>
             {pendingChallenges.map(challenge => (
-              <div key={challenge.id} className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 flex items-center justify-between">
+              <div key={challenge.id} className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <img src={challenge.creator_photo} alt={challenge.creator_name} className="w-10 h-10 rounded-full border border-zinc-800" />
                   <div>
@@ -222,7 +210,7 @@ export const Challenges: React.FC = () => {
                   </button>
                   <button 
                     onClick={() => acceptChallenge(challenge.id)}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded-xl text-xs font-bold active:scale-95 transition-transform"
+                    className="px-4 py-2 bg-emerald-500 text-black rounded-xl text-xs font-bold active:scale-95 transition-transform"
                   >
                     Принять
                   </button>
@@ -257,7 +245,7 @@ export const Challenges: React.FC = () => {
                   <div className="text-xs font-bold">{formatDuration(myTotal)}</div>
                   <button 
                     onClick={() => setShowCreate(true)}
-                    className="text-[8px] font-bold uppercase text-indigo-500 hover:underline"
+                    className="text-[8px] font-bold uppercase text-emerald-500 hover:underline"
                   >
                     Реванш
                   </button>
@@ -288,7 +276,7 @@ export const Challenges: React.FC = () => {
             className="w-full max-w-md bg-zinc-900 rounded-[2.5rem] p-8 space-y-8 text-center border border-zinc-800"
           >
             <div className="space-y-2">
-              <div className="w-16 h-16 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Sword size={32} />
               </div>
               <h3 className="text-2xl font-bold text-white">Вызвать друга</h3>
@@ -324,7 +312,7 @@ export const Challenges: React.FC = () => {
               {createdChallengeId ? (
                 <button
                   onClick={() => copyChallengeLink(createdChallengeId)}
-                  className="flex-[2] py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
+                  className="flex-[2] py-4 bg-emerald-500 text-black rounded-2xl font-bold flex items-center justify-center gap-2"
                 >
                   <Share2 size={20} />
                   Копировать ссылку
@@ -333,7 +321,7 @@ export const Challenges: React.FC = () => {
                 <button
                   onClick={handleCreateChallenge}
                   disabled={loading}
-                  className="flex-[2] py-4 bg-indigo-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2"
+                  className="flex-[2] py-4 bg-emerald-500 text-black rounded-2xl font-bold flex items-center justify-center gap-2"
                 >
                   {loading ? <Loader2 className="animate-spin" size={20} /> : <Share2 size={20} />}
                   {loading ? 'Создаем...' : 'Отправить вызов'}

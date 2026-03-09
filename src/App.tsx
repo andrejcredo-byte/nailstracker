@@ -250,21 +250,27 @@ function Dashboard() {
               <Heatmap />
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-              <Challenges />
-            </motion.div>
+            {practiceMode === 'nails' && (
+              <>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                  <Challenges />
+                </motion.div>
+                
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+                  <LiveSessions />
+                </motion.div>
+              </>
+            )}
             
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <LiveSessions />
-            </motion.div>
-
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
               <PersonalStats />
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-              <Leaderboard />
-            </motion.div>
+            {practiceMode === 'nails' && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+                <Leaderboard />
+              </motion.div>
+            )}
           </main>
 
           {/* Popups */}

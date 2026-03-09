@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Pause, Smile, Meh, Frown, Sparkles } from 'lucide-react';
+import { Play, Square, Pause, Smile, Meh, Frown, Sparkles, Heart } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatDuration } from '../utils';
 import confetti from 'canvas-confetti';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { MEDITATION_MESSAGES } from '../constants/meditationMessages';
 
 export const Timer: React.FC = () => {
   const { user, data, startPractice, endPractice, practiceMode } = useApp();
@@ -15,16 +16,24 @@ export const Timer: React.FC = () => {
   const [meditationDuration, setMeditationDuration] = useState(10); // in minutes
   const [showIntentionModal, setShowIntentionModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [currentMessage, setCurrentMessage] = useState('');
   const [intention, setIntention] = useState('');
   const timerRef = useRef<any>(null);
   const wakeLockRef = useRef<any>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    gongRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'); // Fallback to a CDN gong if local is missing
-    // If you have a local file, you can use: gongRef.current = new Audio('/assets/gong.mp3');
+    gongRef.current = new Audio('/singingbowl.mp3');
   }, []);
 
+  useEffect(() => {
+    if (showIntentionModal && practiceMode === 'meditation' && scrollRef.current) {
+      const itemHeight = 48;
+      scrollRef.current.scrollTop = (meditationDuration - 1) * itemHeight;
+    }
+  }, [showIntentionModal, practiceMode]);
   const activeChallenge = data.challenges?.find(c => c.status === 'active' && (c.creator_id === user?.id || c.opponent_id === user?.id));
 
   // Screen Wake Lock logic
@@ -163,7 +172,14 @@ export const Timer: React.FC = () => {
   const handleEnd = () => {
     setIsPracticing(false);
     setIsPaused(false);
-    setShowMoodModal(true);
+    
+    if (practiceMode === 'meditation') {
+      const randomMsg = MEDITATION_MESSAGES[Math.floor(Math.random() * MEDITATION_MESSAGES.length)];
+      setCurrentMessage(randomMsg);
+      setShowMessageModal(true);
+    } else {
+      setShowMoodModal(true);
+    }
   };
 
   const submitPractice = (mood: string) => {
@@ -189,7 +205,9 @@ export const Timer: React.FC = () => {
     }
 
     // Не ждем завершения сетевого запроса, закрываем модалку сразу
-    const currentSeconds = seconds;
+    const currentSeconds = practiceMode === 'meditation' 
+      ? (meditationDuration * 60) - seconds 
+      : seconds;
     const currentIntention = intention;
     
     setShowMoodModal(false);
@@ -302,22 +320,49 @@ export const Timer: React.FC = () => {
             </div>
 
             {practiceMode === 'meditation' && (
-              <div className="space-y-3">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Длительность (мин)</div>
-                <div className="flex gap-2">
-                  {[5, 10, 15, 20].map(m => (
-                    <button
-                      key={m}
-                      onClick={() => setMeditationDuration(m)}
-                      className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
-                        meditationDuration === m 
-                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
-                          : 'bg-indigo-900/20 text-indigo-400 border border-indigo-800/30'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
+              <div className="space-y-4">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 text-center">Длительность (минуты)</div>
+                <div className="relative h-40 flex items-center justify-center overflow-hidden">
+                  {/* Selection Highlight */}
+                  <div className="absolute inset-x-0 h-12 border-y border-indigo-500/30 bg-indigo-500/5 pointer-events-none" />
+                  
+                  <div 
+                    ref={scrollRef}
+                    className="w-full h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-14"
+                    onScroll={(e) => {
+                      const element = e.currentTarget;
+                      const itemHeight = 48; // h-12 is 48px
+                      const index = Math.round(element.scrollTop / itemHeight);
+                      const value = index + 1;
+                      if (value >= 1 && value <= 120 && value !== meditationDuration) {
+                        setMeditationDuration(value);
+                        // Subtle haptic on scroll
+                        try {
+                          const tg = (window as any).Telegram?.WebApp;
+                          if (tg?.HapticFeedback) {
+                            tg.HapticFeedback.impactOccurred('light');
+                          }
+                        } catch (e) {}
+                      }
+                    }}
+                  >
+                    {Array.from({ length: 120 }, (_, i) => i + 1).map(m => (
+                      <div 
+                        key={m}
+                        className={`h-12 flex items-center justify-center snap-center transition-all duration-200 ${
+                          meditationDuration === m 
+                            ? 'text-3xl font-black text-white' 
+                            : 'text-xl font-bold text-zinc-600 opacity-40'
+                        }`}
+                      >
+                        {m}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Gradient Overlays */}
+                  <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-[#1A1C2E] to-transparent pointer-events-none" />
+                  <div className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-[#1A1C2E] to-transparent pointer-events-none" />
                 </div>
               </div>
             )}
@@ -353,6 +398,46 @@ export const Timer: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Meditation Message Modal */}
+      <AnimatePresence>
+        {showMessageModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              className="w-full max-w-md bg-[#1A1C2E] rounded-[3rem] p-10 text-center border border-indigo-500/20 space-y-8 shadow-2xl shadow-indigo-500/10"
+            >
+              <div className="w-20 h-20 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mx-auto">
+                <Heart size={40} fill="currentColor" className="animate-pulse" />
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-indigo-400 text-[10px] font-bold uppercase tracking-[0.3em]">Послание для тебя</h3>
+                <p className="text-xl font-medium leading-relaxed text-indigo-50">
+                  {currentMessage}
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowMessageModal(false);
+                  setShowMoodModal(true);
+                }}
+                className="w-full py-5 bg-indigo-500 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+              >
+                Принять с благодарностью
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showMoodModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
