@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Sparkles, Clock, RefreshCw } from 'lucide-react';
+import { Sparkles, Clock, RefreshCw, Wind, Zap } from 'lucide-react';
 
 export const LiveSessions: React.FC = () => {
   const { data, user, refreshData } = useApp();
@@ -47,20 +47,23 @@ export const LiveSessions: React.FC = () => {
       
       {liveSessions.length === 0 && !data.live_error ? (
         <div className="bg-zinc-900/30 border border-dashed border-zinc-800 rounded-3xl p-6 text-center">
-          <p className="text-zinc-600 text-xs italic">Сейчас никто не стоит на гвоздях. Будь первым!</p>
+          <p className="text-zinc-600 text-xs italic">Сейчас никто не практикует. Будь первым!</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
           {liveSessions.map((session) => {
             const isMe = String(session.telegram_id) === String(user?.id);
+            const isMeditation = session.type === 'meditation';
             const startTime = session.start_time ? new Date(session.start_time) : null;
             const elapsedMins = (!startTime || isNaN(startTime.getTime())) ? 0 : Math.floor((Date.now() - startTime.getTime()) / 60000);
             
             return (
               <div 
                 key={session.telegram_id}
-                className={`flex items-center gap-3 p-3 rounded-2xl border ${
-                  isMe ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'
+                className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors duration-500 ${
+                  isMe 
+                    ? (isMeditation ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-emerald-500/10 border-emerald-500/20') 
+                    : 'bg-zinc-900 border-zinc-800'
                 } animate-in fade-in zoom-in duration-300`}
               >
                 <div className="relative">
@@ -72,24 +75,33 @@ export const LiveSessions: React.FC = () => {
                     <img 
                       src={session.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`}
                       alt={session.name}
-                      className="w-8 h-8 rounded-full border border-zinc-800 object-cover"
+                      className={`w-8 h-8 rounded-full border object-cover ${isMeditation ? 'border-indigo-500/30' : 'border-zinc-800'}`}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(session.name || 'U')}&background=random`;
                       }}
                     />
                   </button>
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-black animate-pulse" />
+                  <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-black animate-pulse ${
+                    isMeditation ? 'bg-indigo-400' : 'bg-emerald-500'
+                  }`} />
                 </div>
                 
                 <div className="flex flex-col">
-                  <button 
-                    onClick={() => openProfile(session.username)}
-                    disabled={!session.username}
-                    className={`text-xs font-bold truncate max-w-[80px] text-left ${session.username ? 'hover:text-emerald-500 cursor-pointer' : 'cursor-default'}`}
-                  >
-                    {isMe ? 'Ты' : session.name}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => openProfile(session.username)}
+                      disabled={!session.username}
+                      className={`text-xs font-bold truncate max-w-[80px] text-left ${
+                        session.username 
+                          ? (isMeditation ? 'hover:text-indigo-400' : 'hover:text-emerald-500') 
+                          : 'cursor-default'
+                      }`}
+                    >
+                      {isMe ? 'Ты' : session.name}
+                    </button>
+                    {isMeditation ? <Wind size={10} className="text-indigo-400" /> : <Zap size={10} className="text-emerald-500" />}
+                  </div>
                   <div className="flex items-center gap-1 text-[10px] text-zinc-500">
                     <Clock size={10} />
                     <span>{elapsedMins}м</span>

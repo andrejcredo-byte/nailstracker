@@ -61,7 +61,8 @@ function Dashboard() {
   const { 
     user, loading, error, data, refreshData, 
     newlyUnlocked, clearNewlyUnlocked, showAchievements, setShowAchievements,
-    newPersonalBest, clearNewPersonalBest, acceptChallenge
+    newPersonalBest, clearNewPersonalBest, acceptChallenge,
+    practiceMode, setPracticeMode
   } = useApp();
 
   React.useEffect(() => {
@@ -122,7 +123,11 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pb-12 overflow-x-hidden selection:bg-emerald-500 selection:text-black">
+    <div className={`min-h-screen transition-colors duration-700 pb-12 overflow-x-hidden ${
+      practiceMode === 'nails' 
+        ? 'bg-black text-white selection:bg-emerald-500 selection:text-black' 
+        : 'bg-[#0F1121] text-[#E0E7FF] selection:bg-[#A5B4FC] selection:text-black'
+    }`}>
       {/* Error Toast */}
       <AnimatePresence>
         {error && (
@@ -172,10 +177,14 @@ function Dashboard() {
         </div>
       ) : (
         <>
-          <header className="p-6 flex items-center justify-between sticky top-0 bg-black/80 backdrop-blur-xl z-40 border-b border-zinc-900">
+          <header className={`p-6 flex items-center justify-between sticky top-0 backdrop-blur-xl z-40 border-b transition-colors duration-700 ${
+            practiceMode === 'nails' ? 'bg-black/80 border-zinc-900' : 'bg-[#0F1121]/80 border-indigo-900/30'
+          }`}>
             <div className="space-y-0.5">
               <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Sadhu Tracker</h1>
-              <p className="text-zinc-500 text-[10px] font-bold tracking-[0.2em] uppercase">Energy & Focus</p>
+              <p className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-700 ${
+                practiceMode === 'nails' ? 'text-zinc-500' : 'text-indigo-400'
+              }`}>Energy & Focus</p>
             </div>
             <div className="flex items-center gap-3">
               <button 
@@ -201,6 +210,34 @@ function Dashboard() {
           </header>
 
           <main className="px-6 mt-6 space-y-8">
+            {/* Mode Switcher */}
+            <div className="flex justify-center">
+              <div className={`p-1 rounded-2xl flex gap-1 transition-colors duration-700 ${
+                practiceMode === 'nails' ? 'bg-zinc-900' : 'bg-indigo-900/30'
+              }`}>
+                <button
+                  onClick={() => setPracticeMode('nails')}
+                  className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+                    practiceMode === 'nails' 
+                      ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Гвозди
+                </button>
+                <button
+                  onClick={() => setPracticeMode('meditation')}
+                  className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+                    practiceMode === 'meditation' 
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Медитация
+                </button>
+              </div>
+            </div>
+
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
               <Quotes />
             </motion.div>

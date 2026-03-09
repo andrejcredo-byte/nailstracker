@@ -16,7 +16,7 @@ export function getAchievementsProgress(sessions: any[], telegramId: string): Ac
     progressPercent: 0
   }));
 
-  const userSessions = sessions.filter(s => s.telegram_id === telegramId);
+  const userSessions = sessions.filter(s => s.telegram_id === telegramId && s.type === 'nails');
   const totalSeconds = userSessions.reduce((acc, s) => acc + (Number(s.duration_seconds) || 0), 0);
   const bestSingleSession = Math.max(0, ...userSessions.map(s => Number(s.duration_seconds) || 0));
   const streak = calculateStreak(sessions, telegramId);

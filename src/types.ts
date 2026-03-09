@@ -17,6 +17,7 @@ export interface Session {
   intention: string;
   mood: string;
   start_time: string;
+  type: 'nails' | 'meditation';
 }
 
 export interface Challenge {

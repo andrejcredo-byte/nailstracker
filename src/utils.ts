@@ -15,7 +15,7 @@ export function calculateStreak(sessions: any[], telegramId: string): number {
   if (!sessions || !telegramId) return 0;
   
   const userSessions = sessions
-    .filter(s => s.telegram_id == telegramId && s.start_time && !isNaN(new Date(s.start_time).getTime()))
+    .filter(s => s.telegram_id == telegramId && s.type === 'nails' && s.start_time && !isNaN(new Date(s.start_time).getTime()))
     .map(s => new Date(s.start_time).toDateString())
     .filter((v, i, a) => a.indexOf(v) === i) // unique dates
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());

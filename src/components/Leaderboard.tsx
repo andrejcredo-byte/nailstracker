@@ -10,7 +10,7 @@ export const Leaderboard: React.FC = () => {
     try {
       return Object.values(
         (sessions || [])
-          .filter(s => s && s.telegram_id)
+          .filter(s => s && s.telegram_id && s.type === 'nails')
           .reduce((acc: any, session) => {
             const id = session.telegram_id;
             if (!acc[id]) {

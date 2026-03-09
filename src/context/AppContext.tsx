@@ -13,6 +13,8 @@ interface AppContextType {
   newlyUnlocked: Achievement[];
   newPersonalBest: number | null;
   showAchievements: boolean;
+  practiceMode: 'nails' | 'meditation';
+  setPracticeMode: (mode: 'nails' | 'meditation') => void;
   setShowAchievements: (show: boolean) => void;
   clearNewlyUnlocked: () => void;
   clearNewPersonalBest: () => void;
@@ -35,6 +37,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
   const [newPersonalBest, setNewPersonalBest] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [practiceMode, setPracticeMode] = useState<'nails' | 'meditation'>('nails');
 
   const clearNewlyUnlocked = () => setNewlyUnlocked([]);
   const clearNewPersonalBest = () => setNewPersonalBest(null);
@@ -196,7 +199,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           photo_url: user.photo || '',
           intention: intention,
           start_time: new Date().toISOString(),
-          last_ping: new Date().toISOString()
+          last_ping: new Date().toISOString(),
+          type: practiceMode
         });
 
       if (liveError) {
@@ -244,7 +248,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           duration_seconds: duration,
           intention,
           mood,
-          start_time: new Date().toISOString()
+          start_time: new Date().toISOString(),
+          type: practiceMode
         });
 
       if (insertError) {
@@ -263,18 +268,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Supabase live_sessions delete error:', deleteError);
       }
 
-      // 3. Update active challenges
-      const activeChallenges = (data.challenges || []).filter(c => 
-        c.status === 'active' && (c.creator_id === user.id || c.opponent_id === user.id)
-      );
+      // 3. Update active challenges (ONLY for nails)
+      if (practiceMode === 'nails') {
+        const activeChallenges = (data.challenges || []).filter(c => 
+          c.status === 'active' && (c.creator_id === user.id || c.opponent_id === user.id)
+        );
 
-      for (const challenge of activeChallenges) {
-        const isCreator = challenge.creator_id === user.id;
-        const updateData = isCreator 
-          ? { creator_total_seconds: challenge.creator_total_seconds + duration }
-          : { opponent_total_seconds: challenge.opponent_total_seconds + duration };
-        
-        await supabase.from("challenges").update(updateData).eq('id', challenge.id);
+        for (const challenge of activeChallenges) {
+          const isCreator = challenge.creator_id === user.id;
+          const updateData = isCreator 
+            ? { creator_total_seconds: challenge.creator_total_seconds + duration }
+            : { opponent_total_seconds: challenge.opponent_total_seconds + duration };
+          
+          await supabase.from("challenges").update(updateData).eq('id', challenge.id);
+        }
       }
 
       console.log('Session saved and live session removed');
@@ -420,7 +427,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{ 
       user, data, loading, error, isPracticing, 
-      newlyUnlocked, newPersonalBest, showAchievements, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
+      newlyUnlocked, newPersonalBest, showAchievements, practiceMode, setPracticeMode, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
       refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge
     }}>
       {children}
