@@ -15,6 +15,7 @@ import { AchievementsScreen } from './components/AchievementsScreen';
 import { Heatmap } from './components/Heatmap';
 import { Challenges } from './components/Challenges';
 import { PersonalBestPopup } from './components/PersonalBestPopup';
+import { DebugLogs } from './components/DebugLogs';
 import { Loader2, Frown, RefreshCw, Trophy, Sword } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -305,6 +306,8 @@ function Dashboard() {
           Создано для осознанной практики • 2026
         </p>
       </footer>
+      
+      <DebugLogs />
     </div>
   );
 }

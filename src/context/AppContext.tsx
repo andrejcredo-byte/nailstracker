@@ -9,6 +9,7 @@ interface AppContextType {
   data: AppData;
   loading: boolean;
   error: string | null;
+  logs: { message: string; timestamp: string; type: 'error' | 'info' }[];
   isPracticing: boolean;
   newlyUnlocked: Achievement[];
   newPersonalBest: number | null;
@@ -33,7 +34,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [data, setData] = useState<AppData>({ sessions: [], challenges: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [logs, setLogs] = useState<{ message: string; timestamp: string; type: 'error' | 'info' }[]>([]);
   const [isPracticing, setIsPracticing] = useState(false);
+
+  const addLog = (message: string, type: 'error' | 'info' = 'info') => {
+    const newLog = { message, timestamp: new Date().toLocaleTimeString(), type };
+    setLogs(prev => [newLog, ...prev].slice(0, 50)); // Keep last 50 logs
+    if (type === 'error') {
+      setError(message);
+    }
+  };
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
   const [newPersonalBest, setNewPersonalBest] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -103,10 +113,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         challenges: challenges,
         live_error: liveErrorMsg
       });
-      setError(null);
+      // Don't clear error here if it was set by something else recently
+      // setError(null); 
     } catch (err: any) {
       console.error('Failed to fetch data from Supabase:', err);
-      setError(`Ошибка сети: ${err.message || 'Неизвестная ошибка'}`);
+      addLog(`Ошибка сети: ${err.message || 'Неизвестная ошибка'}`, 'error');
     }
   };
 
@@ -184,36 +195,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     
-    try {
-      console.log('Starting live session...', { telegram_id: user.id, intention });
-      
-      // First, try to remove any stale session for this user
-      await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
+    const maxRetries = 3;
+    let attempt = 0;
+    
+    while (attempt < maxRetries) {
+      try {
+        attempt++;
+        console.log(`Starting live session (attempt ${attempt})...`, { telegram_id: user.id, intention });
+        addLog(`Запуск сессии (попытка ${attempt})...`);
+        
+        // First, try to remove any stale session for this user
+        await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
 
-      const { error: liveError } = await supabase
-        .from("live_sessions")
-        .insert({
-          telegram_id: user.id,
-          name: user.first_name,
-          username: user.username || '',
-          photo_url: user.photo || '',
-          intention: intention,
-          start_time: new Date().toISOString(),
-          last_ping: new Date().toISOString(),
-          type: practiceMode
-        });
+        const { error: liveError } = await supabase
+          .from("live_sessions")
+          .insert({
+            telegram_id: user.id,
+            name: user.first_name,
+            username: user.username || '',
+            photo_url: user.photo || '',
+            intention: intention,
+            start_time: new Date().toISOString(),
+            last_ping: new Date().toISOString(),
+            type: practiceMode
+          });
 
-      if (liveError) {
-        console.error('Supabase live_sessions start error:', liveError);
-        setError(`Ошибка запуска Live: ${liveError.message} (Код: ${liveError.code})`);
-      } else {
-        console.log('Live session record created successfully');
-        setIsPracticing(true);
-        await refreshData();
+        if (liveError) {
+          console.error('Supabase live_sessions start error:', liveError);
+          throw liveError;
+        } else {
+          console.log('Live session record created successfully');
+          addLog('Сессия успешно запущена в БД');
+          setIsPracticing(true);
+          await refreshData();
+          return; // Success!
+        }
+      } catch (err: any) {
+        console.error(`Failure in startPractice (attempt ${attempt}):`, err);
+        const isLastAttempt = attempt === maxRetries;
+        
+        if (isLastAttempt) {
+          addLog(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`, 'error');
+        } else {
+          addLog(`Ошибка сети, пробуем еще раз... (${attempt}/${maxRetries})`);
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
       }
-    } catch (err: any) {
-      console.error('Critical failure in startPractice:', err);
-      setError(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`);
     }
   };
 
@@ -254,7 +282,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (insertError) {
         console.error('Supabase insert error:', insertError);
-        setError(`Ошибка сохранения: ${insertError.message}`);
+        addLog(`Ошибка сохранения: ${insertError.message}`, 'error');
         return;
       }
 
@@ -314,7 +342,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
     } catch (err: any) {
       console.error('Failed to save session to Supabase:', err);
-      setError(`Ошибка сохранения: ${err.message || 'Неизвестная ошибка'}`);
+      addLog(`Ошибка сохранения: ${err.message || 'Неизвестная ошибка'}`, 'error');
     }
   };
 
@@ -426,7 +454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      user, data, loading, error, isPracticing, 
+      user, data, loading, error, logs, isPracticing, 
       newlyUnlocked, newPersonalBest, showAchievements, practiceMode, setPracticeMode, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
       refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge
     }}>

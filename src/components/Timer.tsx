@@ -122,9 +122,36 @@ export const Timer: React.FC = () => {
               clearInterval(interval);
               if (gongRef.current) {
                 gongRef.current.currentTime = 0;
+                gongRef.current.volume = 0;
                 gongRef.current.play().catch(e => console.error('Gong error:', e));
+                
+                // Smooth fade in
+                let vol = 0;
+                const fadeIn = setInterval(() => {
+                  vol += 0.05;
+                  if (vol >= 1) {
+                    if (gongRef.current) gongRef.current.volume = 1;
+                    clearInterval(fadeIn);
+                  } else {
+                    if (gongRef.current) gongRef.current.volume = vol;
+                  }
+                }, 50);
+
                 setTimeout(() => {
-                  if (gongRef.current) gongRef.current.pause();
+                  // Smooth fade out
+                  let outVol = 1;
+                  const fadeOut = setInterval(() => {
+                    outVol -= 0.02;
+                    if (outVol <= 0) {
+                      if (gongRef.current) {
+                        gongRef.current.volume = 0;
+                        gongRef.current.pause();
+                      }
+                      clearInterval(fadeOut);
+                    } else {
+                      if (gongRef.current) gongRef.current.volume = outVol;
+                    }
+                  }, 50);
                 }, 12000);
               }
               handleEnd();
