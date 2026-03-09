@@ -181,18 +181,20 @@ function Dashboard() {
             practiceMode === 'nails' ? 'bg-black/80 border-zinc-900' : 'bg-[#0F1121]/80 border-indigo-900/30'
           }`}>
             <div className="space-y-0.5">
-              <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Sadhu Tracker</h1>
+              <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">ZenFlow</h1>
               <p className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-700 ${
                 practiceMode === 'nails' ? 'text-zinc-500' : 'text-indigo-400'
               }`}>Energy & Focus</p>
             </div>
             <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setShowAchievements(true)}
-                className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 active:scale-90 transition-transform"
-              >
-                <Trophy size={20} />
-              </button>
+              {practiceMode === 'nails' && (
+                <button 
+                  onClick={() => setShowAchievements(true)}
+                  className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center border border-amber-500/20 active:scale-90 transition-transform"
+                >
+                  <Trophy size={20} />
+                </button>
+              )}
               <div className="text-right hidden xs:block">
                 <div className="text-sm font-bold truncate max-w-[120px]">{user.first_name}</div>
                 <div className="text-[10px] text-zinc-500 font-mono">@{user.username || 'user'}</div>
@@ -262,9 +264,11 @@ function Dashboard() {
               </>
             )}
             
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-              <PersonalStats />
-            </motion.div>
+            {practiceMode === 'nails' && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+                <PersonalStats />
+              </motion.div>
+            )}
 
             {practiceMode === 'nails' && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>

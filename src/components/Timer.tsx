@@ -120,7 +120,13 @@ export const Timer: React.FC = () => {
           if (practiceMode === 'meditation') {
             if (s <= 1) {
               clearInterval(interval);
-              gongRef.current?.play().catch(e => console.error('Gong error:', e));
+              if (gongRef.current) {
+                gongRef.current.currentTime = 0;
+                gongRef.current.play().catch(e => console.error('Gong error:', e));
+                setTimeout(() => {
+                  if (gongRef.current) gongRef.current.pause();
+                }, 12000);
+              }
               handleEnd();
               return 0;
             }
@@ -368,11 +374,10 @@ export const Timer: React.FC = () => {
             )}
 
             <textarea
-              autoFocus
               value={intention}
               onChange={(e) => setIntention(e.target.value)}
               placeholder={practiceMode === 'nails' ? "Например: Спокойствие и ясность ума..." : "Например: Глубокое расслабление..."}
-              className={`w-full rounded-2xl p-4 text-white placeholder:text-zinc-600 outline-none min-h-[120px] resize-none transition-all ${
+              className={`w-full rounded-2xl p-4 text-white placeholder:text-zinc-600 outline-none min-h-[100px] resize-none transition-all ${
                 practiceMode === 'nails' 
                   ? 'bg-zinc-800 focus:ring-2 focus:ring-emerald-500' 
                   : 'bg-indigo-900/20 focus:ring-2 focus:ring-indigo-500 border border-indigo-800/30'
@@ -427,6 +432,9 @@ export const Timer: React.FC = () => {
 
               <button
                 onClick={() => {
+                  if (gongRef.current) {
+                    gongRef.current.pause();
+                  }
                   setShowMessageModal(false);
                   setShowMoodModal(true);
                 }}

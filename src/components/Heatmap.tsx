@@ -36,6 +36,7 @@ export const Heatmap: React.FC = () => {
         date: dateStr,
         totalSeconds,
         count: daySessions.length,
+        sessions: daySessions.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()),
         label: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
       });
     }
@@ -113,19 +114,37 @@ export const Heatmap: React.FC = () => {
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between border border-white/10">
-              <div className="space-y-1">
-                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{selectedDayData.label}</div>
-                <div className="text-sm font-bold">
-                  {selectedDayData.totalSeconds > 0 
-                    ? `Практика: ${formatDuration(selectedDayData.totalSeconds)}`
-                    : 'Нет практики'}
+            <div className="bg-white/5 rounded-[2rem] p-5 border border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{selectedDayData.label}</div>
+                  <div className="text-sm font-bold">
+                    {selectedDayData.totalSeconds > 0 
+                      ? `Всего: ${formatDuration(selectedDayData.totalSeconds)}`
+                      : 'Нет практики'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Сессий</div>
+                  <div className="text-sm font-bold">{selectedDayData.count}</div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Сессий</div>
-                <div className="text-sm font-bold">{selectedDayData.count}</div>
-              </div>
+
+              {selectedDayData.sessions.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  {selectedDayData.sessions.map((session, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs py-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${isMeditation ? 'bg-indigo-400' : 'bg-emerald-500'}`} />
+                        <span className="text-zinc-400">
+                          {new Date(session.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <span className="font-bold text-zinc-200">{formatDuration(session.duration_seconds)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
