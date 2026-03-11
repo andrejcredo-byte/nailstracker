@@ -1,6 +1,13 @@
 export default async function handler(req, res) {
   try {
     const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    // --- ВСТАВЛЯЙ СЮДА ЭТУ СТРОКУ ---
+    console.log("DEBUG: Токен из системы:", TOKEN ? `Получен (длина ${TOKEN.length})` : "ПУСТО");
+    // -------------------------------
+
+    if (!TOKEN) {
+      throw new Error(`Токен бота не найден. В системе сейчас: ${TOKEN}`);
+    }
     
     // Проверка, что токен вообще дошел до функции
     if (!TOKEN) {
