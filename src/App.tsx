@@ -15,7 +15,6 @@ import { AchievementsScreen } from './components/AchievementsScreen';
 import { Heatmap } from './components/Heatmap';
 import { Challenges } from './components/Challenges';
 import { PersonalBestPopup } from './components/PersonalBestPopup';
-import { DebugLogs } from './components/DebugLogs';
 import { Loader2, Frown, RefreshCw, Trophy, Sword } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -30,7 +29,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    // Error logged internally
   }
 
   render() {
@@ -93,7 +92,6 @@ function Dashboard() {
           tg.showAlert('Вызов принят! Битва началась. ⚔️');
         }
       }).catch(err => {
-        console.error('Challenge accept error:', err);
         // Only show error if it's not "already accepted" or similar
         if (tg?.showAlert) {
           tg.showAlert('Не удалось принять вызов. Возможно, он уже неактивен или ты уже в битве.');
@@ -117,7 +115,7 @@ function Dashboard() {
           transition={{ repeat: Infinity, duration: 2 }}
           className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]"
         >
-          Входим в состояние...
+          Загружаем твою энергию...
         </motion.p>
       </div>
     );
@@ -306,8 +304,6 @@ function Dashboard() {
           Создано для осознанной практики • 2026
         </p>
       </footer>
-      
-      <DebugLogs />
     </div>
   );
 }
