@@ -9,7 +9,6 @@ interface AppContextType {
   data: AppData;
   loading: boolean;
   error: string | null;
-  logs: { message: string; timestamp: string; type: 'error' | 'info' }[];
   isPracticing: boolean;
   newlyUnlocked: Achievement[];
   newPersonalBest: number | null;
@@ -31,19 +30,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [data, setData] = useState<AppData>({ sessions: [], challenges: [] });
+  const [data, setData] = useState<AppData>({ sessions: [], challenges: [], live_sessions: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<{ message: string; timestamp: string; type: 'error' | 'info' }[]>([]);
   const [isPracticing, setIsPracticing] = useState(false);
-
-  const addLog = (message: string, type: 'error' | 'info' = 'info') => {
-    const newLog = { message, timestamp: new Date().toLocaleTimeString(), type };
-    setLogs(prev => [newLog, ...prev].slice(0, 50)); // Keep last 50 logs
-    if (type === 'error') {
-      setError(message);
-    }
-  };
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
   const [newPersonalBest, setNewPersonalBest] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -53,24 +43,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearNewPersonalBest = () => setNewPersonalBest(null);
 
   const refreshData = async () => {
-    try {
-      console.log('Fetching data from Supabase...');
-      
-      // 1. Cleanup stale live sessions in BACKGROUND (don't await)
-      const cleanupStale = async () => {
-        try {
-          const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
-          await supabase.from("live_sessions").delete().lt('last_ping', oneMinuteAgo);
-          
-          const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-          await supabase.from("live_sessions").delete().is('last_ping', null).lt('start_time', fiveMinsAgo);
-        } catch (e) {
-          console.warn('Background cleanup failed:', e);
-        }
-      };
-      cleanupStale();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return;
+    }
 
-      // 2. Fetch data in PARALLEL
+    try {
+      // 1. Fetch data in PARALLEL
       const [sessionsRes, liveSessionsRes, challengesRes] = await Promise.all([
         supabase.from("sessions").select("*").order("start_time", { ascending: false }),
         supabase.from("live_sessions").select("*"),
@@ -81,7 +62,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let sessionsError = sessionsRes.error;
       
       if (sessionsError) {
-        console.error('Supabase sessions fetch error:', sessionsError);
         if (sessionsError.message.includes('start_time')) {
           const { data: retrySessions, error: retryError } = await supabase.from("sessions").select("*");
           if (!retryError && retrySessions) {
@@ -97,39 +77,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let liveErrorMsg: string | null = null;
       if (liveError) {
-        console.error('Supabase live_sessions fetch error:', liveError);
         if (liveError.code === 'PGRST116' || liveError.message.includes('does not exist')) {
           liveErrorMsg = 'Таблица live_sessions не найдена.';
+        } else if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch')) {
+          liveErrorMsg = 'Ошибка сети при загрузке Live-сессий. Проверьте подключение или VPN.';
         } else {
           liveErrorMsg = `Ошибка Live: ${liveError.message}`;
         }
       }
 
-      console.log(`Fetched ${sessions?.length || 0} sessions, ${liveSessions?.length || 0} live sessions, ${challenges.length} challenges`);
-      
       setData({
         sessions: sessions || [],
         live_sessions: liveSessions || [],
         challenges: challenges,
         live_error: liveErrorMsg
       });
-      // Don't clear error here if it was set by something else recently
-      // setError(null); 
+      setError(null);
     } catch (err: any) {
-      console.error('Failed to fetch data from Supabase:', err);
-      addLog(`Ошибка сети: ${err.message || 'Неизвестная ошибка'}`, 'error');
+      if (err.message?.includes('NetworkError') || err.message?.includes('fetch')) {
+        setError('Ошибка сети. Проверьте подключение к интернету или VPN.');
+      } else {
+        setError(`Ошибка загрузки данных: ${err.message || 'Неизвестная ошибка'}`);
+      }
     }
   };
 
   useEffect(() => {
     const initApp = async () => {
-      console.log('Initializing App...');
-      
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !supabaseKey) {
-        console.error('Supabase environment variables are missing!');
         setError('Конфигурация Supabase отсутствует. Проверьте переменные окружения.');
       }
 
@@ -164,9 +142,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     initApp();
-    
-    const interval = setInterval(refreshData, 15000); // More frequent updates for live sessions
-    return () => clearInterval(interval);
   }, []);
 
   // Heartbeat effect
@@ -180,7 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .update({ last_ping: new Date().toISOString() })
           .eq('telegram_id', user.id);
       } catch (err) {
-        console.error('Heartbeat failed:', err);
+        // Silent fail
       }
     };
 
@@ -190,71 +165,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const startPractice = async (intention: string) => {
     if (!user || user.is_mock) {
-      console.log('Practice started in preview mode (not saving)');
       setIsPracticing(true);
       return;
     }
     
-    const maxRetries = 3;
-    let attempt = 0;
-    
-    while (attempt < maxRetries) {
-      try {
-        attempt++;
-        console.log(`Starting live session (attempt ${attempt})...`, { telegram_id: user.id, intention });
-        addLog(`Запуск сессии (попытка ${attempt})...`);
-        
-        // First, try to remove any stale session for this user
-        await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
+    try {
+      // First, try to remove any stale session for this user
+      await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
 
-        const { error: liveError } = await supabase
-          .from("live_sessions")
-          .insert({
-            telegram_id: user.id,
-            name: user.first_name,
-            username: user.username || '',
-            photo_url: user.photo || '',
-            intention: intention,
-            start_time: new Date().toISOString(),
-            last_ping: new Date().toISOString(),
-            type: practiceMode
-          });
+      const { error: liveError } = await supabase
+        .from("live_sessions")
+        .insert({
+          telegram_id: user.id,
+          name: user.first_name,
+          username: user.username || '',
+          photo_url: user.photo || '',
+          intention: intention,
+          start_time: new Date().toISOString(),
+          last_ping: new Date().toISOString(),
+          type: practiceMode
+        });
 
-        if (liveError) {
-          console.error('Supabase live_sessions start error:', liveError);
-          throw liveError;
+      if (liveError) {
+        if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch')) {
+          setError('Ошибка сети при запуске сессии. Проверьте подключение.');
         } else {
-          console.log('Live session record created successfully');
-          addLog('Сессия успешно запущена в БД');
-          setIsPracticing(true);
-          await refreshData();
-          return; // Success!
+          setError(`Ошибка запуска Live: ${liveError.message} (Код: ${liveError.code})`);
         }
-      } catch (err: any) {
-        console.error(`Failure in startPractice (attempt ${attempt}):`, err);
-        const isLastAttempt = attempt === maxRetries;
-        
-        if (isLastAttempt) {
-          addLog(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`, 'error');
-        } else {
-          addLog(`Ошибка сети, пробуем еще раз... (${attempt}/${maxRetries})`);
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
+      } else {
+        setIsPracticing(true);
+        await refreshData();
       }
+    } catch (err: any) {
+      setError(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`);
     }
   };
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
     setIsPracticing(false);
     if (!user || user.is_mock) {
-      console.log('Practice ended in preview mode (not saving)');
       return;
     }
     
     try {
-      console.log('Saving session to Supabase...', { telegram_id: user.id, duration });
-      
       // Check for personal best BEFORE saving
       const userSessions = data.sessions.filter(s => s.telegram_id === user.id);
       const previousBest = userSessions.length > 0 
@@ -281,8 +234,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
 
       if (insertError) {
-        console.error('Supabase insert error:', insertError);
-        addLog(`Ошибка сохранения: ${insertError.message}`, 'error');
+        if (insertError.message.includes('NetworkError') || insertError.message.includes('fetch')) {
+          setError('Ошибка сети при сохранении. Проверьте подключение.');
+        } else {
+          setError(`Ошибка сохранения: ${insertError.message}`);
+        }
         return;
       }
 
@@ -291,10 +247,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .from("live_sessions")
         .delete()
         .eq('telegram_id', user.id);
-
-      if (deleteError) {
-        console.warn('Supabase live_sessions delete error:', deleteError);
-      }
 
       // 3. Update active challenges (ONLY for nails)
       if (practiceMode === 'nails') {
@@ -312,8 +264,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      console.log('Session saved and live session removed');
-      
       // Check for new achievements
       const newSessions = [...data.sessions, { 
         telegram_id: user.id, 
@@ -322,7 +272,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } as any];
       const unlocked = checkNewAchievements(data.sessions, newSessions, user.id);
       if (unlocked.length > 0) {
-        console.log('New achievements unlocked:', unlocked);
         setNewlyUnlocked(unlocked);
         
         // Haptic feedback via Telegram WebApp for iPhone
@@ -335,14 +284,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }, 100);
           }
         } catch (e) {
-          console.error('Haptic error:', e);
+          // Silent fail
         }
       }
 
       await refreshData();
     } catch (err: any) {
-      console.error('Failed to save session to Supabase:', err);
-      addLog(`Ошибка сохранения: ${err.message || 'Неизвестная ошибка'}`, 'error');
+      setError(`Ошибка сохранения: ${err.message || 'Неизвестная ошибка'}`);
     }
   };
 
@@ -393,7 +341,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (challenge.creator_id === user.id) {
-      console.log('Cannot accept your own challenge');
       return;
     }
     
@@ -454,7 +401,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{ 
-      user, data, loading, error, logs, isPracticing, 
+      user, data, loading, error, isPracticing, 
       newlyUnlocked, newPersonalBest, showAchievements, practiceMode, setPracticeMode, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
       refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge
     }}>
