@@ -1,44 +1,61 @@
 export default async function handler(req, res) {
+  try {
+    const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    
+    // Проверка, что токен вообще дошел до функции
+    if (!TOKEN) {
+      throw new Error("Токен бота не найден в переменных окружения");
+    }
 
-try {
+    const message = "🔥 А вы уже стояли на гвоздях сегодня? Добавили для вас практику медитации, с сюрпризом, попробуйте! 🙏";
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN
+    const response = await fetch(
+      `${process.env.VITE_SUPABASE_URL}/rest/v1/sessions?select=telegram_id`,
+      {
+        headers: {
+          apikey: process.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${process.env.VITE_SUPABASE_ANON_KEY}`
+        }
+      }
+    );
 
-const message = "🔥 А вы уже стояли на гвоздях сегодня? Добавили для вас практику медитации, с сюрпризом, попробуйте! 🙏"
+    const data = await response.json();
 
-const response = await fetch(
-`${process.env.VITE_SUPABASE_URL}/rest/v1/sessions?select=telegram_id`,
-{
-headers: {
-apikey: process.env.VITE_SUPABASE_ANON_KEY,
-Authorization: `Bearer ${process.env.VITE_SUPABASE_ANON_KEY}`
-}
-}
-)
+    // Фильтруем пустые значения на всякий случай
+    const ids = [...new Set(data.map(u => u.telegram_id).filter(Boolean))];
 
-const data = await response.json()
+    let successCount = 0;
+    let errors = [];
 
-const ids = [...new Set(data.map(u => u.telegram_id))]
+    for (const id of ids) {
+      const tgResponse = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: id,
+          text: message
+        })
+      });
 
-for (const id of ids) {
+      // Читаем, что ответил Telegram
+      const tgData = await tgResponse.json();
 
-await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-method: "POST",
-headers: { "Content-Type": "application/json" },
-body: JSON.stringify({
-chat_id: id,
-text: message
-})
-})
+      if (tgData.ok) {
+        successCount++;
+      } else {
+        // Записываем причину, почему Telegram не отправил сообщение
+        errors.push({ chat_id: id, reason: tgData.description });
+      }
+    }
 
-}
+    // Теперь в ответе будет полная картина
+    res.status(200).json({ 
+      total_found: ids.length, 
+      sent_successfully: successCount,
+      failed: errors
+    });
 
-res.status(200).json({ sent: ids.length })
-
-} catch (error) {
-
-res.status(500).json({ error: error.message })
-
-}
-
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 }
