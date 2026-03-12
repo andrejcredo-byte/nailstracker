@@ -25,7 +25,8 @@ export const Timer: React.FC = () => {
   const wakeLockRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
-  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const silenceNodeRef = useRef<GainNode | null>(null);
 
   // Initialize Web Worker for background timing
   useEffect(() => {
@@ -59,17 +60,33 @@ export const Timer: React.FC = () => {
 
   useEffect(() => {
     gongRef.current = new Audio('/singingbowl.mp3');
-    // 10 seconds of high-quality silence to satisfy mobile OS background requirements
-    const silentWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
-    silentAudioRef.current = new Audio(silentWav);
-    if (silentAudioRef.current) {
-      silentAudioRef.current.loop = true;
-      // This is crucial: keep the audio object alive
-      silentAudioRef.current.addEventListener('ended', () => {
-        if (isPracticing && !isPaused) silentAudioRef.current?.play();
-      });
+    gongRef.current.preload = 'auto';
+    
+    return () => {
+      audioContextRef.current?.close();
+    };
+  }, []);
+
+  const initAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Create a continuous silent hum using an oscillator
+      // This is much more reliable than a silent MP3 loop
+      const osc = audioContextRef.current.createOscillator();
+      const gain = audioContextRef.current.createGain();
+      
+      gain.gain.value = 0.001; // Virtually silent but technically active
+      osc.connect(gain);
+      gain.connect(audioContextRef.current.destination);
+      
+      osc.start();
+      silenceNodeRef.current = gain;
     }
-  }, [isPracticing, isPaused]);
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
+  };
 
   useEffect(() => {
     if (showIntentionModal && practiceMode === 'meditation' && scrollRef.current) {
@@ -138,8 +155,8 @@ export const Timer: React.FC = () => {
               setIntention(live.intention || '');
               setIsPracticing(true);
               
-              // Start silent audio to prevent sleep
-              silentAudioRef.current?.play().catch(() => {});
+              // Start audio context
+              initAudioContext();
             }
           }
         }
@@ -163,8 +180,8 @@ export const Timer: React.FC = () => {
             setAccumulatedTime(0);
             setSeconds(practiceMode === 'meditation' ? meditationDuration * 60 : 0);
             
-            // Start silent audio to prevent sleep
-            silentAudioRef.current?.play().catch(() => {});
+            // Start audio context
+            initAudioContext();
             return 0;
           }
           return s - 1;
@@ -186,26 +203,36 @@ export const Timer: React.FC = () => {
             artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
           });
 
-          // Add handlers to make the OS treat this as a real media player
+          // Sync position state so the lock screen timer actually moves
+          if (nav.mediaSession.setPositionState) {
+            const duration = practiceMode === 'meditation' ? meditationDuration * 60 : 3600;
+            const position = practiceMode === 'meditation' 
+              ? Math.max(0, meditationDuration * 60 - seconds)
+              : seconds;
+            
+            nav.mediaSession.setPositionState({
+              duration: duration,
+              playbackRate: 1,
+              position: Math.min(position, duration)
+            });
+          }
+
           nav.mediaSession.setActionHandler('play', () => {
             setIsPaused(false);
-            silentAudioRef.current?.play().catch(() => {});
+            audioContextRef.current?.resume();
           });
           nav.mediaSession.setActionHandler('pause', () => {
             setIsPaused(true);
-            silentAudioRef.current?.pause();
+            audioContextRef.current?.suspend();
           });
-          // These help keep the session active
-          nav.mediaSession.setActionHandler('seekbackward', () => {});
-          nav.mediaSession.setActionHandler('seekforward', () => {});
         }
       } catch (e) {
         console.error("MediaSession error:", e);
       }
 
-      // Ensure silent audio is playing to keep app alive
-      if (silentAudioRef.current && silentAudioRef.current.paused) {
-        silentAudioRef.current.play().catch(() => {});
+      // Ensure audio context is active
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {});
       }
 
       const handleTick = () => {
@@ -221,8 +248,8 @@ export const Timer: React.FC = () => {
           if (remaining === 0 && totalElapsed > 5) {
             timerWorkerRef.current?.postMessage('stop');
             
-            if (silentAudioRef.current) {
-              silentAudioRef.current.pause();
+            if (audioContextRef.current) {
+              audioContextRef.current.suspend();
             }
 
             if (gongRef.current) {
@@ -295,9 +322,8 @@ export const Timer: React.FC = () => {
   const handleStart = () => {
     if (!intention.trim()) return;
     
-    if (silentAudioRef.current) {
-      silentAudioRef.current.play().catch(() => {});
-    }
+    // Initialize Web Audio API on user gesture
+    initAudioContext();
 
     // Haptic feedback on start for iPhone
     try {
@@ -326,7 +352,7 @@ export const Timer: React.FC = () => {
       // Resuming
       setStartTime(Date.now());
       setIsPaused(false);
-      silentAudioRef.current?.play().catch(() => {});
+      audioContextRef.current?.resume().catch(() => {});
     } else {
       // Pausing
       if (startTime) {
@@ -335,7 +361,7 @@ export const Timer: React.FC = () => {
       }
       setStartTime(null);
       setIsPaused(true);
-      silentAudioRef.current?.pause();
+      audioContextRef.current?.suspend().catch(() => {});
     }
   };
 
@@ -343,7 +369,7 @@ export const Timer: React.FC = () => {
     setIsPracticing(false);
     setIsPaused(false);
     setStartTime(null);
-    silentAudioRef.current?.pause();
+    audioContextRef.current?.suspend().catch(() => {});
     timerWorkerRef.current?.postMessage('stop');
     
     // Clear Media Session
