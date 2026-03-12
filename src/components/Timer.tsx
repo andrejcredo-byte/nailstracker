@@ -261,43 +261,27 @@ export const Timer: React.FC = () => {
               audioContextRef.current.suspend();
             }
 
-            if (gongRef.current) {
-              gongRef.current.currentTime = 0;
-              gongRef.current.volume = 0;
-              // Play immediately - we pre-warmed this in handleStart
-              gongRef.current.play().then(() => {
-                // Smooth fade in
-                let vol = 0;
-                const fadeIn = setInterval(() => {
-                  vol += 0.05;
-                  if (vol >= 1) {
-                    if (gongRef.current) gongRef.current.volume = 1;
-                    clearInterval(fadeIn);
-                  } else {
-                    if (gongRef.current) gongRef.current.volume = vol;
-                  }
-                }, 50);
+            if (gongRef.current && gainNodeRef.current && audioContextRef.current) {
+  const ctx = audioContextRef.current;
+  const gain = gainNodeRef.current;
+  const now = ctx.currentTime;
 
-                setTimeout(() => {
-                  // Smooth fade out
-                  let outVol = 1;
-                  const fadeOut = setInterval(() => {
-                    outVol -= 0.02;
-                    if (outVol <= 0) {
-                      if (gongRef.current) {
-                        gongRef.current.volume = 0;
-                        gongRef.current.pause();
-                      }
-                      clearInterval(fadeOut);
-                    } else {
-                      if (gongRef.current) gongRef.current.volume = outVol;
-                    }
-                  }, 100);
-                }, 12000);
-              }).catch(e => console.error("Gong background play failed:", e));
-            }
-            handleEnd();
-          }
+  // 1. Убираем "хлопок" динамика (ставим громкость в почти 0)
+  gain.gain.cancelScheduledValues(now);
+  gain.gain.setValueAtTime(0.0001, now);
+  
+  // 2. Плавный взлет (тот самый "шелковый" звук за 4 секунды)
+  gain.gain.exponentialRampToValueAtTime(1.0, now + 4.0); 
+
+  // Запускаем воспроизведение самого файла singingbowl
+  gongRef.current.currentTime = 0;
+  gongRef.current.play().catch(e => console.error("Ошибка воспроизведения гонга:", e));
+
+  // 3. Плавное затухание в конце (через 12 секунд после начала)
+  const fadeOutStart = now + 12.0;
+  gain.gain.setValueAtTime(1.0, fadeOutStart);
+  gain.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
+}
         } else {
           setSeconds(totalElapsed);
           // Haptic feedback every minute
