@@ -170,14 +170,19 @@ export const Timer: React.FC = () => {
       timerWorkerRef.current?.postMessage('start');
       
       // Setup Media Session to keep app alive
-      if ('mediaSession' in navigator && (window as any).MediaMetadata) {
-        navigator.mediaSession.playbackState = 'playing';
-        navigator.mediaSession.metadata = new (window as any).MediaMetadata({
-          title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
-          artist: 'Твоя СИЛА',
-          album: intention || 'Практика',
-          artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
-        });
+      try {
+        if ('mediaSession' in navigator && (window as any).MediaMetadata) {
+          const nav = navigator as any;
+          nav.mediaSession.playbackState = 'playing';
+          nav.mediaSession.metadata = new (window as any).MediaMetadata({
+            title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
+            artist: 'Твоя СИЛА',
+            album: intention || 'Практика',
+            artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
+          });
+        }
+      } catch (e) {
+        console.error("MediaSession error:", e);
       }
 
       // Ensure silent audio is playing to keep app alive
@@ -256,7 +261,6 @@ export const Timer: React.FC = () => {
     }
     return () => {
       if (interval) clearInterval(interval);
-      timerWorkerRef.current?.postMessage('stop');
     };
   }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration, startTime, accumulatedTime]);
 
