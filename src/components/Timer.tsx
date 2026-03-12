@@ -344,7 +344,19 @@ export const Timer: React.FC = () => {
     
     // 2. Start physical silent audio (CRITICAL for widget)
     if (silentAudioRef.current) {
+      silentAudioRef.current.volume = 0.1;
       silentAudioRef.current.play().catch(e => console.error("Silent audio play failed:", e));
+    }
+
+    // 3. UNLOCK GONG (Crucial for mobile background play)
+    // We play it for a tiny fraction and pause to "bless" the element
+    if (gongRef.current) {
+      gongRef.current.volume = 0;
+      gongRef.current.play().then(() => {
+        gongRef.current?.pause();
+        if (gongRef.current) gongRef.current.volume = 1;
+        if (gongRef.current) gongRef.current.currentTime = 0;
+      }).catch(() => {});
     }
 
     // Haptic feedback on start for iPhone
