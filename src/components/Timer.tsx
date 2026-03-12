@@ -59,13 +59,17 @@ export const Timer: React.FC = () => {
 
   useEffect(() => {
     gongRef.current = new Audio('/singingbowl.mp3');
-    // Longer silent audio track (10 seconds of silence) to prevent looping clicks
-    // This is a standard 10s silent base64 wav
-    silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+    // 10 seconds of high-quality silence to satisfy mobile OS background requirements
+    const silentWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+    silentAudioRef.current = new Audio(silentWav);
     if (silentAudioRef.current) {
       silentAudioRef.current.loop = true;
+      // This is crucial: keep the audio object alive
+      silentAudioRef.current.addEventListener('ended', () => {
+        if (isPracticing && !isPaused) silentAudioRef.current?.play();
+      });
     }
-  }, []);
+  }, [isPracticing, isPaused]);
 
   useEffect(() => {
     if (showIntentionModal && practiceMode === 'meditation' && scrollRef.current) {
@@ -174,13 +178,26 @@ export const Timer: React.FC = () => {
       try {
         if ('mediaSession' in navigator && (window as any).MediaMetadata) {
           const nav = navigator as any;
-          nav.mediaSession.playbackState = 'playing';
+          nav.mediaSession.playbackState = isPaused ? 'paused' : 'playing';
           nav.mediaSession.metadata = new (window as any).MediaMetadata({
             title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
             artist: 'Твоя СИЛА',
             album: intention || 'Практика',
             artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
           });
+
+          // Add handlers to make the OS treat this as a real media player
+          nav.mediaSession.setActionHandler('play', () => {
+            setIsPaused(false);
+            silentAudioRef.current?.play().catch(() => {});
+          });
+          nav.mediaSession.setActionHandler('pause', () => {
+            setIsPaused(true);
+            silentAudioRef.current?.pause();
+          });
+          // These help keep the session active
+          nav.mediaSession.setActionHandler('seekbackward', () => {});
+          nav.mediaSession.setActionHandler('seekforward', () => {});
         }
       } catch (e) {
         console.error("MediaSession error:", e);
