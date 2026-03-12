@@ -21,11 +21,37 @@ export const Timer: React.FC = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
   const [intention, setIntention] = useState('');
-  const timerRef = useRef<any>(null);
+  const timerWorkerRef = useRef<Worker | null>(null);
   const wakeLockRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize Web Worker for background timing
+  useEffect(() => {
+    const workerCode = `
+      let timer = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          if (timer) clearInterval(timer);
+          timer = setInterval(() => {
+            self.postMessage('tick');
+          }, 1000);
+        } else if (e.data === 'stop') {
+          clearInterval(timer);
+          timer = null;
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    timerWorkerRef.current = new Worker(url);
+
+    return () => {
+      timerWorkerRef.current?.terminate();
+      URL.revokeObjectURL(url);
+    };
+  }, []);
 
   useEffect(() => {
     gongRef.current = new Audio('/singingbowl.mp3');
@@ -136,12 +162,26 @@ export const Timer: React.FC = () => {
         });
       }, 1000);
     } else if (isPracticing && !isPaused && startTime) {
+      // Start Web Worker timer
+      timerWorkerRef.current?.postMessage('start');
+      
+      // Setup Media Session to keep app alive
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
+          artist: 'Твоя СИЛА',
+          album: intention || 'Практика',
+          artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
+        });
+      }
+
       // Ensure silent audio is playing to keep app alive
       if (silentAudioRef.current && silentAudioRef.current.paused) {
         silentAudioRef.current.play().catch(() => {});
       }
 
-      interval = setInterval(() => {
+      const handleTick = () => {
         const now = Date.now();
         const currentElapsed = Math.floor((now - startTime) / 1000);
         const totalElapsed = accumulatedTime + currentElapsed;
@@ -151,7 +191,7 @@ export const Timer: React.FC = () => {
           setSeconds(remaining);
           
           if (remaining === 0) {
-            clearInterval(interval);
+            timerWorkerRef.current?.postMessage('stop');
             
             if (silentAudioRef.current) {
               silentAudioRef.current.pause();
@@ -204,10 +244,13 @@ export const Timer: React.FC = () => {
             }
           }
         }
-      }, 1000);
+      };
+
+      timerWorkerRef.current!.onmessage = handleTick;
     }
     return () => {
       if (interval) clearInterval(interval);
+      timerWorkerRef.current?.postMessage('stop');
     };
   }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration, startTime, accumulatedTime]);
 
@@ -282,6 +325,12 @@ export const Timer: React.FC = () => {
     setIsPaused(false);
     setStartTime(null);
     silentAudioRef.current?.pause();
+    timerWorkerRef.current?.postMessage('stop');
+    
+    // Clear Media Session
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+    }
     
     if (practiceMode === 'meditation') {
       const randomMsg = MEDITATION_MESSAGES[Math.floor(Math.random() * MEDITATION_MESSAGES.length)];
