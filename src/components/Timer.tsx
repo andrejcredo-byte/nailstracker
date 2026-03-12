@@ -43,14 +43,18 @@ export const Timer: React.FC = () => {
         }
       };
     `;
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    timerWorkerRef.current = new Worker(url);
+    try {
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      timerWorkerRef.current = new Worker(url);
 
-    return () => {
-      timerWorkerRef.current?.terminate();
-      URL.revokeObjectURL(url);
-    };
+      return () => {
+        timerWorkerRef.current?.terminate();
+        URL.revokeObjectURL(url);
+      };
+    } catch (e) {
+      console.error("Failed to initialize Web Worker:", e);
+    }
   }, []);
 
   useEffect(() => {
@@ -166,9 +170,9 @@ export const Timer: React.FC = () => {
       timerWorkerRef.current?.postMessage('start');
       
       // Setup Media Session to keep app alive
-      if ('mediaSession' in navigator) {
+      if ('mediaSession' in navigator && (window as any).MediaMetadata) {
         navigator.mediaSession.playbackState = 'playing';
-        navigator.mediaSession.metadata = new MediaMetadata({
+        navigator.mediaSession.metadata = new (window as any).MediaMetadata({
           title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
           artist: 'Твоя СИЛА',
           album: intention || 'Практика',
@@ -246,7 +250,9 @@ export const Timer: React.FC = () => {
         }
       };
 
-      timerWorkerRef.current!.onmessage = handleTick;
+      if (timerWorkerRef.current) {
+        timerWorkerRef.current.onmessage = handleTick;
+      }
     }
     return () => {
       if (interval) clearInterval(interval);
