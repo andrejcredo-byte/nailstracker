@@ -10,10 +10,14 @@ const BOT_CONFIG = {
 };
 
 export const Challenges: React.FC = () => {
-  const { user, data, createChallenge, acceptChallenge, leaveChallenge } = useApp();
+  const { user, data, createChallenge, acceptChallenge, leaveChallenge, setBackButton } = useApp();
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createdChallengeId, setCreatedChallengeId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setBackButton(showCreate, () => setShowCreate(false));
+  }, [showCreate]);
 
   const myChallenges = useMemo(() => {
     if (!user) return [];
@@ -57,7 +61,7 @@ export const Challenges: React.FC = () => {
       }
       setShowCreate(false);
     } catch (e) {
-      console.error('Failed to create challenge:', e);
+      // Silent fail
     } finally {
       setLoading(false);
     }
@@ -72,7 +76,7 @@ export const Challenges: React.FC = () => {
         tg.showAlert('Ссылка скопирована! Отправь её другу.');
       }
     } catch (err) {
-      console.error('Failed to copy:', err);
+      // Silent fail
     }
   };
 
@@ -87,7 +91,7 @@ export const Challenges: React.FC = () => {
           tg.HapticFeedback.notificationOccurred('warning');
         }
       } catch (e) {
-        console.error('Failed to leave challenge:', e);
+        // Silent fail
       } finally {
         setLoading(false);
       }

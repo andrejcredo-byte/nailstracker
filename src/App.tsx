@@ -180,7 +180,7 @@ function Dashboard() {
             practiceMode === 'nails' ? 'bg-black/80 border-zinc-900' : 'bg-[#0F1121]/80 border-indigo-900/30'
           }`}>
             <div className="space-y-0.5">
-              <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">ZenFlow</h1>
+              <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Твоя СИЛА</h1>
               <p className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-700 ${
                 practiceMode === 'nails' ? 'text-zinc-500' : 'text-indigo-400'
               }`}>Energy & Focus</p>

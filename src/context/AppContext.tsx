@@ -24,6 +24,7 @@ interface AppContextType {
   createChallenge: () => Promise<string>;
   acceptChallenge: (challengeId: string) => Promise<void>;
   leaveChallenge: (challengeId: string) => Promise<void>;
+  setBackButton: (visible: boolean, onClick?: () => void) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -34,6 +35,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPracticing, setIsPracticing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
   const [newPersonalBest, setNewPersonalBest] = useState<number | null>(null);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -117,6 +119,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tg.ready();
         tg.expand();
         
+        // Handle theme changes
+        const handleThemeChange = () => {
+          const colorScheme = tg.colorScheme;
+          document.documentElement.classList.toggle('dark', colorScheme === 'dark');
+        };
+        tg.onEvent('themeChanged', handleThemeChange);
+        handleThemeChange();
+
         const tgUser = tg.initDataUnsafe.user;
         setUser({
           id: String(tgUser.id),
@@ -164,11 +174,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isPracticing, user]);
 
   const startPractice = async (intention: string) => {
+    if (isProcessing) return;
     if (!user || user.is_mock) {
       setIsPracticing(true);
       return;
     }
     
+    setIsProcessing(true);
     try {
       // First, try to remove any stale session for this user
       await supabase.from("live_sessions").delete().eq('telegram_id', user.id);
@@ -198,15 +210,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err: any) {
       setError(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const endPractice = async (duration: number, intention: string, mood: string) => {
+    if (isProcessing) return;
     setIsPracticing(false);
     if (!user || user.is_mock) {
       return;
     }
     
+    setIsProcessing(true);
     try {
       // Check for personal best BEFORE saving
       const userSessions = data.sessions.filter(s => s.telegram_id === user.id);
@@ -239,11 +255,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           setError(`Ошибка сохранения: ${insertError.message}`);
         }
+        setIsProcessing(false);
         return;
       }
 
       // 2. Remove from live sessions
-      const { error: deleteError } = await supabase
+      await supabase
         .from("live_sessions")
         .delete()
         .eq('telegram_id', user.id);
@@ -256,11 +273,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         for (const challenge of activeChallenges) {
           const isCreator = challenge.creator_id === user.id;
-          const updateData = isCreator 
-            ? { creator_total_seconds: challenge.creator_total_seconds + duration }
-            : { opponent_total_seconds: challenge.opponent_total_seconds + duration };
           
-          await supabase.from("challenges").update(updateData).eq('id', challenge.id);
+          // Use RPC or a more robust update if possible, but for now we'll fetch fresh data
+          // to avoid overwriting opponent's progress
+          const { data: freshChallenge } = await supabase
+            .from("challenges")
+            .select("*")
+            .eq('id', challenge.id)
+            .single();
+
+          if (freshChallenge) {
+            const updateData = isCreator 
+              ? { creator_total_seconds: (freshChallenge.creator_total_seconds || 0) + duration }
+              : { opponent_total_seconds: (freshChallenge.opponent_total_seconds || 0) + duration };
+            
+            await supabase.from("challenges").update(updateData).eq('id', challenge.id);
+          }
         }
       }
 
@@ -291,6 +319,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
     } catch (err: any) {
       setError(`Ошибка сохранения: ${err.message || 'Неизвестная ошибка'}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -375,6 +405,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await refreshData();
   };
 
+  const setBackButton = (visible: boolean, onClick?: () => void) => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (!tg?.BackButton) return;
+
+    if (visible) {
+      tg.BackButton.show();
+      if (onClick) {
+        tg.BackButton.offClick();
+        tg.BackButton.onClick(onClick);
+      }
+    } else {
+      tg.BackButton.hide();
+      tg.BackButton.offClick();
+    }
+  };
+
   // Add a helper to check for expired challenges
   useEffect(() => {
     if (data.challenges && data.challenges.length > 0) {
@@ -403,7 +449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{ 
       user, data, loading, error, isPracticing, 
       newlyUnlocked, newPersonalBest, showAchievements, practiceMode, setPracticeMode, setShowAchievements, clearNewlyUnlocked, clearNewPersonalBest,
-      refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge
+      refreshData, startPractice, endPractice, createChallenge, acceptChallenge, leaveChallenge, setBackButton
     }}>
       {children}
     </AppContext.Provider>

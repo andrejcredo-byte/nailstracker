@@ -41,7 +41,6 @@ export const Leaderboard: React.FC = () => {
           }, {})
       ).sort((a: any, b: any) => b.total_duration_seconds - a.total_duration_seconds);
     } catch (e) {
-      console.error('Leaderboard calculation error:', e);
       return [];
     }
   }, [sessions]);

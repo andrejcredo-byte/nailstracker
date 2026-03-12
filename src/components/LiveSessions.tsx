@@ -4,7 +4,11 @@ import { Sparkles, Clock, RefreshCw, Wind, Zap } from 'lucide-react';
 
 export const LiveSessions: React.FC = () => {
   const { data, user, refreshData } = useApp();
-  const liveSessions = data?.live_sessions || [];
+  const liveSessions = (data?.live_sessions || []).filter(s => {
+    const lastPing = new Date(s.last_ping).getTime();
+    const now = Date.now();
+    return (now - lastPing) < 60000; // Only show active in last 60 seconds
+  });
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const handleRefresh = async () => {

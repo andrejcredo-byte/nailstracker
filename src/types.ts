@@ -35,9 +35,21 @@ export interface Challenge {
   opponent_total_seconds: number;
 }
 
+export interface LiveSession {
+  id?: string;
+  telegram_id: string;
+  name: string;
+  username?: string;
+  photo_url?: string;
+  intention: string;
+  start_time: string;
+  last_ping: string;
+  type: 'nails' | 'meditation';
+}
+
 export interface AppData {
   sessions: Session[];
-  live_sessions?: any[];
-  challenges?: Challenge[];
+  live_sessions: LiveSession[];
+  challenges: Challenge[];
   live_error?: string | null;
 }
