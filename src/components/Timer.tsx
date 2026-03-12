@@ -59,7 +59,8 @@ export const Timer: React.FC = () => {
 
   useEffect(() => {
     gongRef.current = new Audio('/singingbowl.mp3');
-    // Silent audio trick to keep the app alive in background
+    // Longer silent audio track (10 seconds of silence) to prevent looping clicks
+    // This is a standard 10s silent base64 wav
     silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
     if (silentAudioRef.current) {
       silentAudioRef.current.loop = true;
@@ -170,14 +171,19 @@ export const Timer: React.FC = () => {
       timerWorkerRef.current?.postMessage('start');
       
       // Setup Media Session to keep app alive
-      if ('mediaSession' in navigator && (window as any).MediaMetadata) {
-        navigator.mediaSession.playbackState = 'playing';
-        navigator.mediaSession.metadata = new (window as any).MediaMetadata({
-          title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
-          artist: 'Твоя СИЛА',
-          album: intention || 'Практика',
-          artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
-        });
+      try {
+        if ('mediaSession' in navigator && (window as any).MediaMetadata) {
+          const nav = navigator as any;
+          nav.mediaSession.playbackState = 'playing';
+          nav.mediaSession.metadata = new (window as any).MediaMetadata({
+            title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
+            artist: 'Твоя СИЛА',
+            album: intention || 'Практика',
+            artwork: [{ src: 'https://picsum.photos/seed/zen/512/512', sizes: '512x512', type: 'image/png' }]
+          });
+        }
+      } catch (e) {
+        console.error("MediaSession error:", e);
       }
 
       // Ensure silent audio is playing to keep app alive
@@ -194,7 +200,8 @@ export const Timer: React.FC = () => {
           const remaining = Math.max(0, meditationDuration * 60 - totalElapsed);
           setSeconds(remaining);
           
-          if (remaining === 0) {
+          // Only allow gong to fire if at least 5 seconds have passed
+          if (remaining === 0 && totalElapsed > 5) {
             timerWorkerRef.current?.postMessage('stop');
             
             if (silentAudioRef.current) {
@@ -256,7 +263,6 @@ export const Timer: React.FC = () => {
     }
     return () => {
       if (interval) clearInterval(interval);
-      timerWorkerRef.current?.postMessage('stop');
     };
   }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration, startTime, accumulatedTime]);
 
@@ -272,16 +278,6 @@ export const Timer: React.FC = () => {
   const handleStart = () => {
     if (!intention.trim()) return;
     
-    // Pre-warm audio: play and immediately pause/reset
-    // This "unlocks" the audio context for background use later
-    if (gongRef.current) {
-      gongRef.current.volume = 0;
-      gongRef.current.play().then(() => {
-        gongRef.current?.pause();
-        if (gongRef.current) gongRef.current.currentTime = 0;
-      }).catch(() => {});
-    }
-
     if (silentAudioRef.current) {
       silentAudioRef.current.play().catch(() => {});
     }
