@@ -15,7 +15,7 @@ export const Timer: React.FC = () => {
   const [seconds, setSeconds] = useState(0);
   const [accumulatedTime, setAccumulatedTime] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [meditationDuration, setMeditationDuration] = useState(10); // in minutes
+  const [meditationDuration, setMeditationDuration] = useState(10); // в минутах
   const [showIntentionModal, setShowIntentionModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -27,13 +27,14 @@ export const Timer: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const gongRef = useRef<HTMLAudioElement | null>(null);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
-  
-  // Рефы для Web Audio API
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Рефы для аудио-движка (та самая рабочая схема)
   const audioContextRef = useRef<AudioContext | null>(null);
-  const gongGainNodeRef = useRef<GainNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
-  // Initialize Web Worker for background timing
+  // Инициализация Web Worker для точного времени в фоне
   useEffect(() => {
     const workerCode = `
       let timer = null;
@@ -65,9 +66,7 @@ export const Timer: React.FC = () => {
 
   useEffect(() => {
     const audio = new Audio('/singingbowl.mp3');
-    audio.preload = 'auto';
     audio.crossOrigin = "anonymous";
-    (audio as any).disableRemotePlayback = true;
     gongRef.current = audio;
     
     try {
@@ -83,33 +82,23 @@ export const Timer: React.FC = () => {
     };
   }, []);
 
-  // Инициализация аудио-движка (вызывается при старте)
-  const initAudioContext = () => {
-    if (!audioContextRef.current) {
+  // Функция настройки аудио-движка (та самая схема без щелчка)
+  const initAudioEngine = () => {
+    if (!audioContextRef.current && gongRef.current) {
       const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass();
+      const gainNode = ctx.createGain();
+      const source = ctx.createMediaElementSource(gongRef.current);
+
+      source.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
       audioContextRef.current = ctx;
-
-      // 1. Keep-alive осциллятор (твой тихий гул)
-      const osc = ctx.createOscillator();
-      const oscGain = ctx.createGain();
-      oscGain.gain.value = 0.001;
-      osc.connect(oscGain);
-      oscGain.connect(ctx.destination);
-      osc.start();
-
-      // 2. Настройка узла для гонга
-      if (gongRef.current) {
-        const gongGain = ctx.createGain();
-        const source = ctx.createMediaElementSource(gongRef.current);
-        source.connect(gongGain);
-        gongGain.connect(ctx.destination);
-        gongGainNodeRef.current = gongGain;
-        sourceNodeRef.current = source;
-      }
+      gainNodeRef.current = gainNode;
+      sourceNodeRef.current = source;
     }
     
-    if (audioContextRef.current.state === 'suspended') {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       audioContextRef.current.resume();
     }
   };
@@ -122,9 +111,8 @@ export const Timer: React.FC = () => {
   }, [showIntentionModal, practiceMode]);
 
   const activeChallenge = data.challenges?.find(c => c.status === 'active' && (c.creator_id === user?.id || c.opponent_id === user?.id));
-  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Screen Wake Lock logic
+  // Логика Wake Lock
   useEffect(() => {
     let interval: any;
     if (isPracticing && !isPaused) {
@@ -147,31 +135,6 @@ export const Timer: React.FC = () => {
   }, [isPracticing, isPaused]);
 
   useEffect(() => {
-    const liveSessions = (data?.live_sessions || []);
-    if (liveSessions.length > 0 && user) {
-      try {
-        const live = liveSessions.find(s => s.telegram_id === user.id);
-        if (live && !isPracticing) {
-          const startTimeStr = live.start_time;
-          if (startTimeStr) {
-            const sTime = new Date(startTimeStr).getTime();
-            if (!isNaN(sTime)) {
-              const now = Date.now();
-              const elapsed = Math.floor((now - sTime) / 1000);
-              setAccumulatedTime(elapsed);
-              setStartTime(now);
-              setSeconds(elapsed);
-              setIntention(live.intention || '');
-              setIsPracticing(true);
-              initAudioContext();
-            }
-          }
-        }
-      } catch (e) {}
-    }
-  }, [data, user, isPracticing]);
-
-  useEffect(() => {
     let interval: any;
     if (isPreparing) {
       interval = setInterval(() => {
@@ -184,7 +147,7 @@ export const Timer: React.FC = () => {
             setStartTime(now);
             setAccumulatedTime(0);
             setSeconds(practiceMode === 'meditation' ? meditationDuration * 60 : 0);
-            initAudioContext();
+            initAudioEngine();
             return 0;
           }
           return s - 1;
@@ -193,10 +156,11 @@ export const Timer: React.FC = () => {
     } else if (isPracticing && !isPaused && startTime) {
       timerWorkerRef.current?.postMessage('start');
       
+      // Настройка MediaSession для работы в фоне
       try {
         if ('mediaSession' in navigator && (window as any).MediaMetadata) {
           const nav = navigator as any;
-          nav.mediaSession.playbackState = isPaused ? 'paused' : 'playing';
+          nav.mediaSession.playbackState = 'playing';
           nav.mediaSession.metadata = new (window as any).MediaMetadata({
             title: practiceMode === 'meditation' ? 'Медитация' : 'Гвоздестояние',
             artist: 'Pure Zen',
@@ -205,10 +169,6 @@ export const Timer: React.FC = () => {
           });
         }
       } catch (e) {}
-
-      if (isPracticing && !isPaused && silentAudioRef.current?.paused) {
-        silentAudioRef.current.play().catch(() => {});
-      }
 
       const handleTick = () => {
         const now = Date.now();
@@ -222,30 +182,33 @@ export const Timer: React.FC = () => {
           if (remaining === 0 && totalElapsed > 5) {
             timerWorkerRef.current?.postMessage('stop');
             
-            // ИСПРАВЛЕННЫЙ ЗАПУСК ГОНГА ЧЕРЕЗ WEB AUDIO API
-            if (gongRef.current && audioContextRef.current && gongGainNodeRef.current) {
+            // ИНТЕГРИРОВАННЫЙ ЗАПУСК ГОНГА ИЗ РАБОЧЕЙ СХЕМЫ
+            if (gongRef.current && audioContextRef.current && gainNodeRef.current) {
               const ctx = audioContextRef.current;
-              const gainNode = gongGainNodeRef.current;
+              const gain = gainNodeRef.current;
               const audioNow = ctx.currentTime;
 
               gongRef.current.currentTime = 0;
               
-              // Плавный фейд-ин (убирает щелчок)
-              gainNode.gain.cancelScheduledValues(audioNow);
-              gainNode.gain.setValueAtTime(0.0001, audioNow);
-              gainNode.gain.exponentialRampToValueAtTime(1.0, audioNow + 4.0); // Нарастание за 4 сек
+              // 1. Убираем щелчок
+              gain.gain.cancelScheduledValues(audioNow);
+              gain.gain.setValueAtTime(0.0001, audioNow);
+              
+              // 2. Плавный взлет
+              gain.gain.exponentialRampToValueAtTime(1.0, audioNow + 4.0); 
 
-              gongRef.current.play().catch(e => console.error("Gong failed:", e));
-
-              // Плавный фейд-аут через 12 секунд
-              const fadeOutStart = audioNow + 12.0;
-              gainNode.gain.setValueAtTime(1.0, fadeOutStart);
-              gainNode.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
+              gongRef.current.play().catch(e => console.error('Gong error:', e));
+              
+              // 3. Плавное затухание
+              const fadeOutStart = audioNow + 12;
+              gain.gain.setValueAtTime(1.0, fadeOutStart);
+              gain.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
 
               setTimeout(() => {
                 if (gongRef.current) gongRef.current.pause();
-              }, 16000);
+              }, 15500);
             }
+
             handleEnd();
           }
         } else {
@@ -286,7 +249,7 @@ export const Timer: React.FC = () => {
 
   const handleStart = () => {
     if (!intention.trim()) return;
-    initAudioContext();
+    initAudioEngine();
     requestWakeLock();
     
     if (silentAudioRef.current) {
