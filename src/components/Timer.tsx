@@ -104,15 +104,25 @@ export const Timer: React.FC = () => {
   }, [showIntentionModal, practiceMode]);
   const activeChallenge = data.challenges?.find(c => c.status === 'active' && (c.creator_id === user?.id || c.opponent_id === user?.id));
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   // Screen Wake Lock logic
   useEffect(() => {
     const requestWakeLock = async () => {
+      // 1. Try standard Wake Lock API
       if ('wakeLock' in navigator) {
         try {
           wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
         } catch (err: any) {
-          // Silent fail
+          console.warn("Wake Lock API failed, falling back to video hack");
         }
+      }
+
+      // 2. Fallback: Play a tiny hidden video to prevent sleeping
+      if (videoRef.current) {
+        videoRef.current.play().catch(() => {
+          // Silent fail if interaction hasn't happened yet
+        });
       }
     };
 
@@ -344,19 +354,7 @@ export const Timer: React.FC = () => {
     
     // 2. Start physical silent audio (CRITICAL for widget)
     if (silentAudioRef.current) {
-      silentAudioRef.current.volume = 0.1;
       silentAudioRef.current.play().catch(e => console.error("Silent audio play failed:", e));
-    }
-
-    // 3. UNLOCK GONG (Crucial for mobile background play)
-    // We play it for a tiny fraction and pause to "bless" the element
-    if (gongRef.current) {
-      gongRef.current.volume = 0;
-      gongRef.current.play().then(() => {
-        gongRef.current?.pause();
-        if (gongRef.current) gongRef.current.volume = 1;
-        if (gongRef.current) gongRef.current.currentTime = 0;
-      }).catch(() => {});
     }
 
     // Haptic feedback on start for iPhone
@@ -471,6 +469,16 @@ export const Timer: React.FC = () => {
         loop
         playsInline
         src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="
+      />
+
+      {/* Hidden tiny video to prevent screen from dimming (Wake Lock fallback) */}
+      <video
+        ref={videoRef}
+        loop
+        muted
+        playsInline
+        className="hidden"
+        src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAAAAADAG1kYXQ="
       />
       
       {!isPracticing && !isPreparing ? (
