@@ -115,7 +115,7 @@ function Dashboard() {
           transition={{ repeat: Infinity, duration: 2 }}
           className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]"
         >
-          Загружаем твою энергию...
+          Входим в состояние...
         </motion.p>
       </div>
     );
