@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MEDITATION_MESSAGES } from '../constants/meditationMessages';
 
 export const Timer: React.FC = () => {
-  const { user, data, startPractice, endPractice, practiceMode } = useApp();
+  const { user, data, startPractice, endPractice, practiceMode, setBackButton } = useApp();
   const [isPracticing, setIsPracticing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
@@ -136,6 +136,11 @@ export const Timer: React.FC = () => {
         });
       }, 1000);
     } else if (isPracticing && !isPaused && startTime) {
+      // Ensure silent audio is playing to keep app alive
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+        silentAudioRef.current.play().catch(() => {});
+      }
+
       interval = setInterval(() => {
         const now = Date.now();
         const currentElapsed = Math.floor((now - startTime) / 1000);
@@ -147,39 +152,45 @@ export const Timer: React.FC = () => {
           
           if (remaining === 0) {
             clearInterval(interval);
+            
+            if (silentAudioRef.current) {
+              silentAudioRef.current.pause();
+            }
+
             if (gongRef.current) {
               gongRef.current.currentTime = 0;
               gongRef.current.volume = 0;
-              gongRef.current.play().catch(e => {});
-              
-              // Smooth fade in
-              let vol = 0;
-              const fadeIn = setInterval(() => {
-                vol += 0.05;
-                if (vol >= 1) {
-                  if (gongRef.current) gongRef.current.volume = 1;
-                  clearInterval(fadeIn);
-                } else {
-                  if (gongRef.current) gongRef.current.volume = vol;
-                }
-              }, 50);
-
-              setTimeout(() => {
-                // Smooth fade out
-                let outVol = 1;
-                const fadeOut = setInterval(() => {
-                  outVol -= 0.02;
-                  if (outVol <= 0) {
-                    if (gongRef.current) {
-                      gongRef.current.volume = 0;
-                      gongRef.current.pause();
-                    }
-                    clearInterval(fadeOut);
+              // Play immediately - we pre-warmed this in handleStart
+              gongRef.current.play().then(() => {
+                // Smooth fade in
+                let vol = 0;
+                const fadeIn = setInterval(() => {
+                  vol += 0.05;
+                  if (vol >= 1) {
+                    if (gongRef.current) gongRef.current.volume = 1;
+                    clearInterval(fadeIn);
                   } else {
-                    if (gongRef.current) gongRef.current.volume = outVol;
+                    if (gongRef.current) gongRef.current.volume = vol;
                   }
                 }, 50);
-              }, 12000);
+
+                setTimeout(() => {
+                  // Smooth fade out
+                  let outVol = 1;
+                  const fadeOut = setInterval(() => {
+                    outVol -= 0.02;
+                    if (outVol <= 0) {
+                      if (gongRef.current) {
+                        gongRef.current.volume = 0;
+                        gongRef.current.pause();
+                      }
+                      clearInterval(fadeOut);
+                    } else {
+                      if (gongRef.current) gongRef.current.volume = outVol;
+                    }
+                  }, 100);
+                }, 12000);
+              }).catch(e => console.error("Gong background play failed:", e));
             }
             handleEnd();
           }
@@ -200,9 +211,32 @@ export const Timer: React.FC = () => {
     };
   }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration, startTime, accumulatedTime]);
 
+  useEffect(() => {
+    const anyModalOpen = showIntentionModal || showMoodModal || showMessageModal;
+    setBackButton(anyModalOpen, () => {
+      setShowIntentionModal(false);
+      setShowMoodModal(false);
+      setShowMessageModal(false);
+    });
+  }, [showIntentionModal, showMoodModal, showMessageModal]);
+
   const handleStart = () => {
     if (!intention.trim()) return;
     
+    // Pre-warm audio: play and immediately pause/reset
+    // This "unlocks" the audio context for background use later
+    if (gongRef.current) {
+      gongRef.current.volume = 0;
+      gongRef.current.play().then(() => {
+        gongRef.current?.pause();
+        if (gongRef.current) gongRef.current.currentTime = 0;
+      }).catch(() => {});
+    }
+
+    if (silentAudioRef.current) {
+      silentAudioRef.current.play().catch(() => {});
+    }
+
     // Haptic feedback on start for iPhone
     try {
       const tg = (window as any).Telegram?.WebApp;
