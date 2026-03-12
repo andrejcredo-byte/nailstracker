@@ -13,52 +13,28 @@ export const Timer: React.FC = () => {
   const [isPreparing, setIsPreparing] = useState(false);
   const [prepSeconds, setPrepSeconds] = useState(5);
   const [seconds, setSeconds] = useState(0);
+  const [accumulatedTime, setAccumulatedTime] = useState(0);
+  const [startTime, setStartTime] = useState<number | null>(null);
   const [meditationDuration, setMeditationDuration] = useState(10); // in minutes
   const [showIntentionModal, setShowIntentionModal] = useState(false);
   const [showMoodModal, setShowMoodModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
   const [intention, setIntention] = useState('');
-  
-  // Рефы для аудио-движка
-  const gongRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  
   const timerRef = useRef<any>(null);
   const wakeLockRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gongRef = useRef<HTMLAudioElement | null>(null);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Инициализация аудио при загрузке
   useEffect(() => {
-    const audio = new Audio('/singingbowl.mp3');
-    audio.crossOrigin = "anonymous";
-    gongRef.current = audio;
-
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
-  }, []);
-
-  // Функция для настройки Web Audio API (вызывается один раз)
-  const initAudioEngine = () => {
-    if (!audioContextRef.current && gongRef.current) {
-      const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      const gainNode = ctx.createGain();
-      const source = ctx.createMediaElementSource(gongRef.current);
-
-      source.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      audioContextRef.current = ctx;
-      gainNodeRef.current = gainNode;
-      sourceNodeRef.current = source;
+    gongRef.current = new Audio('/singingbowl.mp3');
+    // Silent audio trick to keep the app alive in background
+    silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==');
+    if (silentAudioRef.current) {
+      silentAudioRef.current.loop = true;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (showIntentionModal && practiceMode === 'meditation' && scrollRef.current) {
@@ -66,7 +42,6 @@ export const Timer: React.FC = () => {
       scrollRef.current.scrollTop = (meditationDuration - 1) * itemHeight;
     }
   }, [showIntentionModal, practiceMode]);
-
   const activeChallenge = data.challenges?.find(c => c.status === 'active' && (c.creator_id === user?.id || c.opponent_id === user?.id));
 
   // Screen Wake Lock logic
@@ -76,13 +51,25 @@ export const Timer: React.FC = () => {
         try {
           wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
         } catch (err: any) {
-          console.error(`${err.name}, ${err.message}`);
+          // Silent fail
         }
       }
     };
 
+    // For Nails mode, we definitely want to keep the screen on.
+    // For Meditation, we also try to keep it on to ensure the gong plays,
+    // but the user can still manually lock it.
     if (isPracticing && !isPaused) {
       requestWakeLock();
+      
+      // Re-request wake lock if page becomes visible again
+      const handleVisibilityChange = () => {
+        if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
@@ -92,11 +79,41 @@ export const Timer: React.FC = () => {
     }
 
     return () => {
-      if (wakeLockRef.current) wakeLockRef.current.release();
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+      }
     };
   }, [isPracticing, isPaused]);
 
-  // Основная логика таймера и звука
+  useEffect(() => {
+    const liveSessions = (data?.live_sessions || []);
+    if (liveSessions.length > 0 && user) {
+      try {
+        const live = liveSessions.find(s => s.telegram_id === user.id);
+        if (live && !isPracticing) {
+          const startTimeStr = live.start_time;
+          if (startTimeStr) {
+            const sTime = new Date(startTimeStr).getTime();
+            if (!isNaN(sTime)) {
+              const now = Date.now();
+              const elapsed = Math.floor((now - sTime) / 1000);
+              setAccumulatedTime(elapsed);
+              setStartTime(now);
+              setSeconds(elapsed);
+              setIntention(live.intention || '');
+              setIsPracticing(true);
+              
+              // Start silent audio to prevent sleep
+              silentAudioRef.current?.play().catch(() => {});
+            }
+          }
+        }
+      } catch (e) {
+        // Silent fail
+      }
+    }
+  }, [data, user, isPracticing]);
+
   useEffect(() => {
     let interval: any;
     if (isPreparing) {
@@ -106,92 +123,131 @@ export const Timer: React.FC = () => {
             clearInterval(interval);
             setIsPreparing(false);
             setIsPracticing(true);
+            const now = Date.now();
+            setStartTime(now);
+            setAccumulatedTime(0);
             setSeconds(practiceMode === 'meditation' ? meditationDuration * 60 : 0);
+            
+            // Start silent audio to prevent sleep
+            silentAudioRef.current?.play().catch(() => {});
             return 0;
           }
           return s - 1;
         });
       }, 1000);
-    } else if (isPracticing && !isPaused) {
+    } else if (isPracticing && !isPaused && startTime) {
       interval = setInterval(() => {
-        setSeconds(s => {
-          if (practiceMode === 'meditation') {
-            if (s <= 1) {
-              clearInterval(interval);
-              
-              // ЗАПУСК ГОНГА БЕЗ ЩЕЛЧКА
-              if (gongRef.current && audioContextRef.current && gainNodeRef.current) {
-                const ctx = audioContextRef.current;
-                const gain = gainNodeRef.current;
-                const now = ctx.currentTime;
+        const now = Date.now();
+        const currentElapsed = Math.floor((now - startTime) / 1000);
+        const totalElapsed = accumulatedTime + currentElapsed;
 
-                // Сбрасываем трек
-                gongRef.current.currentTime = 0;
-                
-                // 1. Мгновенно в ноль (убирает щелчок)
-                gain.gain.cancelScheduledValues(now);
-                gain.gain.setValueAtTime(0.0001, now);
-                
-                // 2. Плавный экспоненциальный взлет (очень красиво звучит)
-                gain.gain.exponentialRampToValueAtTime(1.0, now + 4.0); 
-
-                gongRef.current.play().catch(e => console.error('Gong play error:', e));
-                
-                // 3. Плавное затухание через 12 секунд
-                const fadeOutStart = now + 12;
-                gain.gain.setValueAtTime(1.0, fadeOutStart);
-                gain.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
-
-                setTimeout(() => {
-                  if (gongRef.current) gongRef.current.pause();
-                }, 15500);
-              }
-
-              handleEnd();
-              return 0;
-            }
-            return s - 1;
-          }
+        if (practiceMode === 'meditation') {
+          const remaining = Math.max(0, meditationDuration * 60 - totalElapsed);
+          setSeconds(remaining);
           
-          const newSeconds = s + 1;
-          if (newSeconds > 0 && newSeconds % 60 === 0) {
-            const tg = (window as any).Telegram?.WebApp;
-            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+          if (remaining === 0) {
+            clearInterval(interval);
+            if (gongRef.current) {
+              gongRef.current.currentTime = 0;
+              gongRef.current.volume = 0;
+              gongRef.current.play().catch(e => {});
+              
+              // Smooth fade in
+              let vol = 0;
+              const fadeIn = setInterval(() => {
+                vol += 0.05;
+                if (vol >= 1) {
+                  if (gongRef.current) gongRef.current.volume = 1;
+                  clearInterval(fadeIn);
+                } else {
+                  if (gongRef.current) gongRef.current.volume = vol;
+                }
+              }, 50);
+
+              setTimeout(() => {
+                // Smooth fade out
+                let outVol = 1;
+                const fadeOut = setInterval(() => {
+                  outVol -= 0.02;
+                  if (outVol <= 0) {
+                    if (gongRef.current) {
+                      gongRef.current.volume = 0;
+                      gongRef.current.pause();
+                    }
+                    clearInterval(fadeOut);
+                  } else {
+                    if (gongRef.current) gongRef.current.volume = outVol;
+                  }
+                }, 50);
+              }, 12000);
+            }
+            handleEnd();
           }
-          return newSeconds;
-        });
+        } else {
+          setSeconds(totalElapsed);
+          // Haptic feedback every minute
+          if (totalElapsed > 0 && totalElapsed % 60 === 0) {
+            const tg = (window as any).Telegram?.WebApp;
+            if (tg?.HapticFeedback) {
+              tg.HapticFeedback.notificationOccurred('success');
+            }
+          }
+        }
       }, 1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration]);
+  }, [isPracticing, isPaused, isPreparing, practiceMode, meditationDuration, startTime, accumulatedTime]);
 
-  const handleStart = async () => {
+  const handleStart = () => {
     if (!intention.trim()) return;
     
-    // Инициализируем и "будим" аудио-движок по клику (важно для iOS)
-    initAudioEngine();
-    if (audioContextRef.current) {
-      await audioContextRef.current.resume();
-    }
-
+    // Haptic feedback on start for iPhone
     try {
       const tg = (window as any).Telegram?.WebApp;
-      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
-    } catch (e) {}
+      if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+      }
+    } catch (e) {
+      // Silent fail
+    }
 
+    const currentIntention = intention;
     setShowIntentionModal(false);
     setIsPreparing(true);
     setPrepSeconds(5);
     setIsPaused(false);
     
-    startPractice(intention).catch(error => console.error('Start practice error:', error));
+    // Запускаем в фоне
+    startPractice(currentIntention).catch(error => {
+      // Silent fail
+    });
+  };
+
+  const togglePause = () => {
+    if (isPaused) {
+      // Resuming
+      setStartTime(Date.now());
+      setIsPaused(false);
+      silentAudioRef.current?.play().catch(() => {});
+    } else {
+      // Pausing
+      if (startTime) {
+        const elapsedSinceStart = Math.floor((Date.now() - startTime) / 1000);
+        setAccumulatedTime(prev => prev + elapsedSinceStart);
+      }
+      setStartTime(null);
+      setIsPaused(true);
+      silentAudioRef.current?.pause();
+    }
   };
 
   const handleEnd = () => {
     setIsPracticing(false);
     setIsPaused(false);
+    setStartTime(null);
+    silentAudioRef.current?.pause();
     
     if (practiceMode === 'meditation') {
       const randomMsg = MEDITATION_MESSAGES[Math.floor(Math.random() * MEDITATION_MESSAGES.length)];
@@ -203,6 +259,7 @@ export const Timer: React.FC = () => {
   };
 
   const submitPractice = (mood: string) => {
+    // Trigger confetti
     confetti({
       particleCount: 150,
       spread: 70,
@@ -210,15 +267,24 @@ export const Timer: React.FC = () => {
       colors: ['#10b981', '#34d399', '#ffffff']
     });
 
+    // Trigger heavy haptic feedback for iPhone
     try {
       const tg = (window as any).Telegram?.WebApp;
       if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('heavy');
-        setTimeout(() => tg.HapticFeedback.notificationOccurred('success'), 100);
+        setTimeout(() => {
+          tg.HapticFeedback.notificationOccurred('success');
+        }, 100);
       }
-    } catch (e) {}
+    } catch (e) {
+      // Silent fail
+    }
 
-    const currentSeconds = practiceMode === 'meditation' ? (meditationDuration * 60) - seconds : seconds;
+    // Не ждем завершения сетевого запроса, закрываем модалку сразу
+    const currentSeconds = practiceMode === 'meditation' 
+      ? (meditationDuration * 60) - seconds 
+      : seconds;
+    const currentIntention = intention;
     
     setShowMoodModal(false);
     setSeconds(0);
@@ -226,7 +292,10 @@ export const Timer: React.FC = () => {
     setIsPracticing(false);
     setIsPaused(false);
 
-    endPractice(currentSeconds, intention, mood).catch(e => console.error('End session error:', e));
+    // Запускаем сохранение в фоне
+    endPractice(currentSeconds, currentIntention, mood).catch(e => {
+      // Silent fail
+    });
   };
 
   return (
@@ -292,7 +361,7 @@ export const Timer: React.FC = () => {
           )}
           <div className="flex gap-4 w-full">
             <button
-              onClick={() => setIsPaused(!isPaused)}
+              onClick={togglePause}
               className={`flex-1 py-4 rounded-2xl flex items-center justify-center gap-2 font-bold active:scale-95 transition-all ${
                 practiceMode === 'nails' ? 'bg-zinc-800 text-white' : 'bg-indigo-900/40 text-indigo-100 border border-indigo-800/30'
               }`}
@@ -330,30 +399,44 @@ export const Timer: React.FC = () => {
               <div className="space-y-4">
                 <div className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 text-center">Длительность (минуты)</div>
                 <div className="relative h-40 flex items-center justify-center overflow-hidden">
+                  {/* Selection Highlight */}
                   <div className="absolute inset-x-0 h-12 border-y border-indigo-500/30 bg-indigo-500/5 pointer-events-none" />
+                  
                   <div 
                     ref={scrollRef}
                     className="w-full h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-14"
                     onScroll={(e) => {
                       const element = e.currentTarget;
-                      const itemHeight = 48;
+                      const itemHeight = 48; // h-12 is 48px
                       const index = Math.round(element.scrollTop / itemHeight);
                       const value = index + 1;
                       if (value >= 1 && value <= 120 && value !== meditationDuration) {
                         setMeditationDuration(value);
+                        // Subtle haptic on scroll
                         try {
                           const tg = (window as any).Telegram?.WebApp;
-                          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                          if (tg?.HapticFeedback) {
+                            tg.HapticFeedback.impactOccurred('light');
+                          }
                         } catch (e) {}
                       }
                     }}
                   >
                     {Array.from({ length: 120 }, (_, i) => i + 1).map(m => (
-                      <div key={m} className={`h-12 flex items-center justify-center snap-center transition-all duration-200 ${meditationDuration === m ? 'text-3xl font-black text-white' : 'text-xl font-bold text-zinc-600 opacity-40'}`}>
+                      <div 
+                        key={m}
+                        className={`h-12 flex items-center justify-center snap-center transition-all duration-200 ${
+                          meditationDuration === m 
+                            ? 'text-3xl font-black text-white' 
+                            : 'text-xl font-bold text-zinc-600 opacity-40'
+                        }`}
+                      >
                         {m}
                       </div>
                     ))}
                   </div>
+                  
+                  {/* Gradient Overlays */}
                   <div className="absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-[#1A1C2E] to-transparent pointer-events-none" />
                   <div className="absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-[#1A1C2E] to-transparent pointer-events-none" />
                 </div>
@@ -371,7 +454,12 @@ export const Timer: React.FC = () => {
               }`}
             />
             <div className="flex gap-3">
-              <button onClick={() => setShowIntentionModal(false)} className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold">Отмена</button>
+              <button
+                onClick={() => setShowIntentionModal(false)}
+                className="flex-1 py-4 bg-zinc-800 text-white rounded-2xl font-bold"
+              >
+                Отмена
+              </button>
               <button
                 onClick={handleStart}
                 disabled={!intention.trim()}
@@ -404,13 +492,19 @@ export const Timer: React.FC = () => {
               <div className="w-20 h-20 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mx-auto">
                 <Heart size={40} fill="currentColor" className="animate-pulse" />
               </div>
+              
               <div className="space-y-4">
                 <h3 className="text-indigo-400 text-[10px] font-bold uppercase tracking-[0.3em]">Послание для тебя</h3>
-                <p className="text-xl font-medium leading-relaxed text-indigo-50">{currentMessage}</p>
+                <p className="text-xl font-medium leading-relaxed text-indigo-50">
+                  {currentMessage}
+                </p>
               </div>
+
               <button
                 onClick={() => {
-                  if (gongRef.current) gongRef.current.pause();
+                  if (gongRef.current) {
+                    gongRef.current.pause();
+                  }
                   setShowMessageModal(false);
                   setShowMoodModal(true);
                 }}
@@ -436,7 +530,10 @@ export const Timer: React.FC = () => {
               </div>
               <h3 className="text-2xl font-bold text-white">Практика завершена!</h3>
               <p className="text-zinc-500">
-                {practiceMode === 'nails' ? `Ты простоял ${formatDuration(seconds)}. Как самочувствие?` : `Медитация окончена. Как ты себя чувствуешь?`}
+                {practiceMode === 'nails' 
+                  ? `Ты простоял ${formatDuration(seconds)}. Как самочувствие?`
+                  : `Медитация окончена. Как ты себя чувствуешь?`
+                }
               </p>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -445,7 +542,11 @@ export const Timer: React.FC = () => {
                 { icon: <Meh size={32} />, label: 'Нормально', emoji: '😐', color: 'text-amber-500 bg-amber-500/10' },
                 { icon: <Frown size={32} />, label: 'Тяжело', emoji: '😣', color: 'text-red-500 bg-red-500/10' },
               ].map((m) => (
-                <button key={m.emoji} onClick={() => submitPractice(m.emoji)} className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all active:scale-90 ${m.color}`}>
+                <button
+                  key={m.emoji}
+                  onClick={() => submitPractice(m.emoji)}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all active:scale-90 ${m.color}`}
+                >
                   {m.icon}
                   <span className="text-xs font-bold uppercase tracking-wider">{m.label}</span>
                 </button>
