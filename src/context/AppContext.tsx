@@ -48,41 +48,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      setError('Конфигурация Supabase не настроена. Пожалуйста, добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в настройки (Settings -> Secrets).');
+      setLoading(false);
       return;
     }
 
     try {
-      // 1. Fetch data in PARALLEL
-      const [sessionsRes, liveSessionsRes, challengesRes] = await Promise.all([
-        supabase.from("sessions").select("*").order("start_time", { ascending: false }),
-        supabase.from("live_sessions").select("*"),
-        supabase.from("challenges").select("*")
+      // 1. Fetch data with individual error handling to be more resilient
+      const sessionsPromise = supabase.from("sessions").select("*").order("start_time", { ascending: false });
+      const liveSessionsPromise = supabase.from("live_sessions").select("*");
+      const challengesPromise = supabase.from("challenges").select("*");
+
+      const [sessionsRes, liveSessionsRes, challengesRes] = await Promise.allSettled([
+        sessionsPromise,
+        liveSessionsPromise,
+        challengesPromise
       ]);
 
-      let sessions = sessionsRes.data;
-      let sessionsError = sessionsRes.error;
+      let sessions = sessionsRes.status === 'fulfilled' ? sessionsRes.value.data : [];
+      let sessionsError = sessionsRes.status === 'fulfilled' ? sessionsRes.value.error : null;
       
       if (sessionsError) {
+        console.error("Sessions error:", sessionsError);
+        // Retry without order if it fails (sometimes happens with missing indexes)
         if (sessionsError.message.includes('start_time')) {
-          const { data: retrySessions, error: retryError } = await supabase.from("sessions").select("*");
-          if (!retryError && retrySessions) {
-            sessions = retrySessions;
-            sessionsError = null;
-          }
+          const { data: retrySessions } = await supabase.from("sessions").select("*");
+          if (retrySessions) sessions = retrySessions;
         }
       }
 
-      const liveSessions = liveSessionsRes.data;
-      const liveError = liveSessionsRes.error;
-      const challenges = challengesRes.data || [];
+      const liveSessions = liveSessionsRes.status === 'fulfilled' ? liveSessionsRes.value.data : [];
+      const liveError = liveSessionsRes.status === 'fulfilled' ? liveSessionsRes.value.error : null;
+      const challenges = challengesRes.status === 'fulfilled' ? challengesRes.value.data : [];
 
       let liveErrorMsg: string | null = null;
       if (liveError) {
         if (liveError.code === 'PGRST116' || liveError.message.includes('does not exist')) {
           liveErrorMsg = 'Таблица live_sessions не найдена.';
-        } else if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch')) {
-          liveErrorMsg = 'Ошибка сети при загрузке Live-сессий. Проверьте подключение или VPN.';
+        } else if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch') || liveError.message.includes('Load failed')) {
+          liveErrorMsg = 'Ошибка сети. Проверьте VPN или подключение.';
         } else {
           liveErrorMsg = `Ошибка Live: ${liveError.message}`;
         }
@@ -91,13 +96,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setData({
         sessions: sessions || [],
         live_sessions: liveSessions || [],
-        challenges: challenges,
+        challenges: challenges || [],
         live_error: liveErrorMsg
       });
       setError(null);
     } catch (err: any) {
-      if (err.message?.includes('NetworkError') || err.message?.includes('fetch')) {
-        setError('Ошибка сети. Проверьте подключение к интернету или VPN.');
+      console.error("Refresh data error:", err);
+      if (err.message?.includes('NetworkError') || err.message?.includes('fetch') || err.message?.includes('Load failed')) {
+        setError('Ошибка сети. Проверьте VPN или подключение к Supabase.');
       } else {
         setError(`Ошибка загрузки данных: ${err.message || 'Неизвестная ошибка'}`);
       }
@@ -149,6 +155,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       await refreshData();
       setLoading(false);
+
+      // 2. Subscribe to real-time updates for live sessions
+      const channel = supabase
+        .channel('live_sessions_changes')
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'live_sessions' }, () => {
+          refreshData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     };
 
     initApp();
@@ -199,17 +217,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
 
       if (liveError) {
-        if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch')) {
-          setError('Ошибка сети при запуске сессии. Проверьте подключение.');
+        if (liveError.message.includes('NetworkError') || liveError.message.includes('fetch') || liveError.message.includes('Load failed')) {
+          setError('Ошибка сети при запуске. Проверьте VPN (Supabase может быть заблокирован).');
         } else {
-          setError(`Ошибка запуска Live: ${liveError.message} (Код: ${liveError.code})`);
+          setError(`Ошибка запуска Live: ${liveError.message}`);
         }
       } else {
         setIsPracticing(true);
-        await refreshData();
+        refreshData(); // Don't await to speed up UI
       }
     } catch (err: any) {
-      setError(`Критическая ошибка: ${err.message || 'Не удалось запустить сессию'}`);
+      console.error("Start practice error:", err);
+      setError(`Ошибка: ${err.message || 'Не удалось запустить сессию'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -250,8 +269,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
 
       if (insertError) {
-        if (insertError.message.includes('NetworkError') || insertError.message.includes('fetch')) {
-          setError('Ошибка сети при сохранении. Проверьте подключение.');
+        console.error("End practice insert error:", insertError);
+        if (insertError.message.includes('NetworkError') || insertError.message.includes('fetch') || insertError.message.includes('Load failed')) {
+          setError('Ошибка сети при сохранении. Проверьте VPN.');
         } else {
           setError(`Ошибка сохранения: ${insertError.message}`);
         }

@@ -61,6 +61,7 @@ export const Timer: React.FC = () => {
   useEffect(() => {
     gongRef.current = new Audio('/singingbowl.mp3');
     gongRef.current.preload = 'auto';
+    (gongRef.current as any).disableRemotePlayback = true;
     
     // Expand Telegram WebApp to full height to prevent sleeping
     try {
@@ -108,51 +109,32 @@ export const Timer: React.FC = () => {
 
   // Screen Wake Lock logic
   useEffect(() => {
-    const requestWakeLock = async () => {
-      // 1. Try standard Wake Lock API
-      if ('wakeLock' in navigator) {
-        try {
-          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-        } catch (err: any) {
-          console.warn("Wake Lock API failed, falling back to video hack");
-        }
-      }
-
-      // 2. Fallback: Play a tiny hidden video to prevent sleeping
-      if (videoRef.current) {
-        videoRef.current.play().catch(() => {
-          // Silent fail if interaction hasn't happened yet
-        });
-      }
-    };
-
-    // For Nails mode, we definitely want to keep the screen on.
-    // For Meditation, we also try to keep it on to ensure the gong plays,
-    // but the user can still manually lock it.
+    let interval: any;
+    
     if (isPracticing && !isPaused) {
-      requestWakeLock();
-      
-      // Re-request wake lock if page becomes visible again
+      // Re-request wake lock every 30 seconds as a safety measure
+      interval = setInterval(() => {
+        if (wakeLockRef.current === null) {
+          requestWakeLock();
+        }
+      }, 30000);
+
       const handleVisibilityChange = () => {
-        if (wakeLockRef.current !== null && document.visibilityState === 'visible') {
+        if (document.visibilityState === 'visible') {
           requestWakeLock();
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
-      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    } else {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release().then(() => {
-          wakeLockRef.current = null;
-        });
-      }
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        clearInterval(interval);
+        if (wakeLockRef.current) {
+          wakeLockRef.current.release().then(() => {
+            wakeLockRef.current = null;
+          });
+        }
+      };
     }
-
-    return () => {
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release();
-      }
-    };
   }, [isPracticing, isPaused]);
 
   useEffect(() => {
@@ -346,13 +328,32 @@ export const Timer: React.FC = () => {
     });
   }, [showIntentionModal, showMoodModal, showMessageModal]);
 
+  const requestWakeLock = async () => {
+    // 1. Try standard Wake Lock API
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      } catch (err: any) {
+        console.warn("Wake Lock API failed");
+      }
+    }
+
+    // 2. Fallback: Play a tiny hidden video to prevent sleeping
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
   const handleStart = () => {
     if (!intention.trim()) return;
     
     // 1. Initialize Web Audio API
     initAudioContext();
     
-    // 2. Start physical silent audio (CRITICAL for widget)
+    // 2. IMMEDIATELY request Wake Lock and play video (Must be inside user interaction)
+    requestWakeLock();
+    
+    // 3. Start physical silent audio
     if (silentAudioRef.current) {
       silentAudioRef.current.play().catch(e => console.error("Silent audio play failed:", e));
     }
@@ -362,6 +363,8 @@ export const Timer: React.FC = () => {
       const tg = (window as any).Telegram?.WebApp;
       if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('medium');
+      } else if (navigator.vibrate) {
+        navigator.vibrate(50);
       }
     } catch (e) {
       // Silent fail
@@ -468,6 +471,8 @@ export const Timer: React.FC = () => {
         ref={silentAudioRef}
         loop
         playsInline
+        // @ts-ignore
+        disableRemotePlayback
         src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=="
       />
 
@@ -477,11 +482,14 @@ export const Timer: React.FC = () => {
         loop
         muted
         playsInline
-        className="hidden"
+        // @ts-ignore
+        disableRemotePlayback
+        style={{ position: 'absolute', top: -10, left: -10, width: 1, height: 1, opacity: 0.01, pointerEvents: 'none' }}
         src="data:video/mp4;base64,AAAAHGZ0eXBpc29tAAAAAGlzb21tcDQyAAAACHZyZWQAAAAAAAADAG1kYXQ="
       />
       
-      {!isPracticing && !isPreparing ? (
+      <div className="select-none">
+        {!isPracticing && !isPreparing ? (
         <button
           onClick={() => setShowIntentionModal(true)}
           className={`w-full py-8 rounded-3xl font-bold text-2xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all duration-500 ${
@@ -736,6 +744,7 @@ export const Timer: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

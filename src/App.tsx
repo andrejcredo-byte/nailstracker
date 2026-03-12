@@ -186,6 +186,12 @@ function Dashboard() {
               }`}>Energy & Focus</p>
             </div>
             <div className="flex items-center gap-3">
+              {data.live_sessions.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/20 animate-pulse">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                  <span className="text-[8px] font-black uppercase tracking-widest text-red-500">Live</span>
+                </div>
+              )}
               {practiceMode === 'nails' && (
                 <button 
                   onClick={() => setShowAchievements(true)}
