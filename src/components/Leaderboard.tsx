@@ -61,7 +61,7 @@ export const Leaderboard: React.FC = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
           <Trophy size={14} className="text-amber-500" />
-          Лидерборд (по времени)
+          Таблица лидеров
         </h3>
       </div>
       
