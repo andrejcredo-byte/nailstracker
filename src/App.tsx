@@ -183,7 +183,7 @@ function Dashboard() {
               <h1 className="text-2xl font-black tracking-tighter uppercase italic text-white">Твоя СИЛА</h1>
               <p className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-700 ${
                 practiceMode === 'nails' ? 'text-zinc-500' : 'text-indigo-400'
-              }`}>Energy & Focus</p>
+              }`}>Энергия & Фокус</p>
             </div>
             <div className="flex items-center gap-3">
               {data.live_sessions.length > 0 && (
