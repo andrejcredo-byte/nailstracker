@@ -27,6 +27,8 @@ export const Timer: React.FC = () => {
   const gongRef = useRef<HTMLAudioElement | null>(null);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Initialize Web Worker for background timing
   useEffect(() => {
@@ -79,16 +81,26 @@ export const Timer: React.FC = () => {
 
   const initAudioContext = () => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContextClass();
       
+      // Create gain node for smooth volume control
+      gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.connect(audioContextRef.current.destination);
+
+      // Connect gong element to gain node
+      if (gongRef.current && !audioSourceRef.current) {
+        audioSourceRef.current = audioContextRef.current.createMediaElementSource(gongRef.current);
+        audioSourceRef.current.connect(gainNodeRef.current);
+      }
+
       // Create a continuous silent hum using an oscillator
-      // This is much more reliable than a silent MP3 loop
       const osc = audioContextRef.current.createOscillator();
-      const gain = audioContextRef.current.createGain();
+      const silentGain = audioContextRef.current.createGain();
       
-      gain.gain.value = 0.001; // Virtually silent but technically active
-      osc.connect(gain);
-      gain.connect(audioContextRef.current.destination);
+      silentGain.gain.value = 0.001; 
+      osc.connect(silentGain);
+      silentGain.connect(audioContextRef.current.destination);
       
       osc.start();
     }
@@ -257,31 +269,39 @@ export const Timer: React.FC = () => {
           if (remaining === 0 && totalElapsed > 5) {
             timerWorkerRef.current?.postMessage('stop');
             
-            if (audioContextRef.current) {
-              audioContextRef.current.suspend();
-            }
-
             if (gongRef.current && gainNodeRef.current && audioContextRef.current) {
-  const ctx = audioContextRef.current;
-  const gain = gainNodeRef.current;
-  const now = ctx.currentTime;
+              const ctx = audioContextRef.current;
+              const gain = gainNodeRef.current;
+              const nowAudio = ctx.currentTime;
 
-  // 1. Убираем "хлопок" динамика (ставим громкость в почти 0)
-  gain.gain.cancelScheduledValues(now);
-  gain.gain.setValueAtTime(0.0001, now);
-  
-  // 2. Плавный взлет (тот самый "шелковый" звук за 4 секунды)
-  gain.gain.exponentialRampToValueAtTime(1.0, now + 4.0); 
+              // Ensure context is running
+              if (ctx.state === 'suspended') {
+                ctx.resume();
+              }
 
-  // Запускаем воспроизведение самого файла singingbowl
-  gongRef.current.currentTime = 0;
-  gongRef.current.play().catch(e => console.error("Ошибка воспроизведения гонга:", e));
+              // 1. Убираем "хлопок" динамика (ставим громкость в почти 0)
+              gain.gain.cancelScheduledValues(nowAudio);
+              gain.gain.setValueAtTime(0.0001, nowAudio);
+              
+              // 2. Плавный взлет (тот самый "шелковый" звук за 4 секунды)
+              gain.gain.exponentialRampToValueAtTime(1.0, nowAudio + 4.0); 
 
-  // 3. Плавное затухание в конце (через 12 секунд после начала)
-  const fadeOutStart = now + 12.0;
-  gain.gain.setValueAtTime(1.0, fadeOutStart);
-  gain.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
-}
+              // Запускаем воспроизведение самого файла singingbowl
+              gongRef.current.currentTime = 0;
+              gongRef.current.play().catch(e => console.error("Ошибка воспроизведения гонга:", e));
+
+              // 3. Плавное затухание в конце (через 12 секунд после начала)
+              const fadeOutStart = nowAudio + 12.0;
+              gain.gain.setValueAtTime(1.0, fadeOutStart);
+              gain.gain.exponentialRampToValueAtTime(0.0001, fadeOutStart + 3.0);
+
+              setTimeout(() => {
+                handleEnd();
+              }, 15000);
+            } else {
+              handleEnd();
+            }
+          }
         } else {
           setSeconds(totalElapsed);
           // Haptic feedback every minute
