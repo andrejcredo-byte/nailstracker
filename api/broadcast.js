@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       throw new Error("TELEGRAM_BOT_TOKEN не найден. Проверь настройки Environment Variables в Vercel и сделай Redeploy.");
     }
 
-    const message = "🔥 А вы уже стояли на гвоздях сегодня? Добавили для вас практику медитации, с сюрпризом, попробуйте! 🙏";
+    const message = "Когда вы последний раз посвящали время себе? Проведите несколько минут в медитации и получите вкусное послание по завершению ❤️️️️️️️";
 
     // 2. Получаем список ID из базы Supabase
     const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/sessions?select=telegram_id`, {
