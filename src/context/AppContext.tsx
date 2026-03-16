@@ -134,13 +134,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleThemeChange();
 
         const tgUser = tg.initDataUnsafe.user;
-        setUser({
+        const userData: User = {
           id: String(tgUser.id),
           username: tgUser.username || '',
           first_name: tgUser.first_name || 'User',
           photo: tgUser.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(tgUser.first_name || 'U')}&background=random`,
           created_at: new Date().toISOString(),
-        });
+        };
+        
+        setUser(userData);
+        
+        // Sync user with Supabase database (in background)
+        supabase
+          .from('users')
+          .upsert({
+            telegram_id: userData.id,
+            username: userData.username,
+            first_name: userData.first_name,
+            photo_url: userData.photo,
+            last_seen: new Date().toISOString()
+          }, { onConflict: 'telegram_id' })
+          .then(({ error: upsertError }) => {
+            if (upsertError) console.error("Error syncing user:", upsertError);
+          })
+          .catch(e => console.error("Failed to sync user with DB:", e));
       } else {
         // Mock user for development
         setUser({
